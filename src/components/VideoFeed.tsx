@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2 } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
+import { ShareModal } from './ShareModal';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -30,6 +31,9 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liking, setLiking] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const { user } = useAuth();
 
@@ -42,14 +46,31 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       videoRefs.current.forEach((video, index) => {
         if (video) {
           if (index === currentIndex) {
-            video.play();
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((error) => {
+                console.log("Autoplay prevented:", error);
+                // If autoplay fails (usually due to unmuted), mute and try again
+                if (!video.muted) {
+                  setIsMuted(true);
+                  video.muted = true;
+                  video.play().catch(e => console.error("Muted autoplay failed:", e));
+                }
+              });
+            }
           } else {
             video.pause();
+            video.currentTime = 0;
           }
         }
       });
     }
   }, [currentIndex, videos]);
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMuted(!isMuted);
+  };
 
   const loadVideos = async () => {
     try {
@@ -194,7 +215,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
   return (
     <div
-      className="h-screen overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+      className="h-screen overflow-y-auto snap-y snap-proximity scrollbar-hide"
       onScroll={handleScroll}
     >
       {videos.map((video, index) => (
@@ -208,13 +229,21 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             className="h-full w-full object-cover"
             loop
             playsInline
-            muted
+            muted={isMuted}
             onDoubleClick={() => handleLike(video)}
           />
 
+          {/* Volume Control */}
+          <button
+            onClick={toggleMute}
+            className="absolute top-20 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-10"
+          >
+            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+          </button>
+
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-          <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-6 text-white">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center mb-2">
@@ -222,37 +251,37 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                     <img
                       src={video.profiles.avatar_url}
                       alt={video.profiles.full_name}
-                      className="w-12 h-12 rounded-full border-2 border-white mr-3"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white mr-2 sm:mr-3"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gray-700 border-2 border-white mr-3 flex items-center justify-center">
-                      <span className="text-lg font-bold">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-700 border-2 border-white mr-2 sm:mr-3 flex items-center justify-center">
+                      <span className="text-base sm:text-lg font-bold">
                         {video.profiles?.full_name.charAt(0)}
                       </span>
                     </div>
                   )}
                   <div>
                     <h3
-                      className="font-semibold text-lg cursor-pointer hover:underline"
+                      className="font-semibold text-base sm:text-lg cursor-pointer hover:underline"
                       onClick={() => onProviderClick?.(video.provider_id)}
                     >
                       {video.profiles?.full_name}
                     </h3>
-                    <p className="text-sm text-gray-200">
+                    <p className="text-xs sm:text-sm text-gray-200">
                       {video.skill_categories?.name}
                     </p>
                   </div>
                 </div>
 
-                <h4 className="font-medium text-base mb-2">{video.title}</h4>
+                <h4 className="font-medium text-sm sm:text-base mb-1 sm:mb-2">{video.title}</h4>
 
                 {video.description && (
-                  <p className="text-sm text-gray-200 mb-3 line-clamp-2">
+                  <p className="text-xs sm:text-sm text-gray-200 mb-2 sm:mb-3 line-clamp-2">
                     {video.description}
                   </p>
                 )}
 
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                   {video.profiles?.location && (
                     <div className="flex items-center">
                       <MapPin className="w-4 h-4 mr-1" />
@@ -269,13 +298,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
                 <button
                   onClick={() => onBookClick(video)}
-                  className="mt-4 bg-blue-600 text-white px-8 py-3 rounded-full font-medium hover:bg-blue-700 transition-colors"
+                  className="mt-2 sm:mt-4 bg-blue-600 text-white px-4 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-blue-700 transition-colors"
                 >
                   Book Now
                 </button>
               </div>
 
-              <div className="flex flex-col items-center gap-6 ml-4">
+              <div className="flex flex-col items-center gap-4 sm:gap-6 ml-2 sm:ml-4">
                 <button
                   onClick={() => handleLike(video)}
                   disabled={liking}
@@ -287,11 +316,34 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                   />
                   <span className="text-xs mt-1">{video.likes_count}</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedVideo(video);
+                    setShareModalOpen(true);
+                  }}
+                  className="flex flex-col items-center"
+                >
+                  <Share2 className="w-8 h-8 text-white" />
+                  <span className="text-xs mt-1">Share</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       ))}
+
+      {selectedVideo && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => {
+            setShareModalOpen(false);
+            setSelectedVideo(null);
+          }}
+          videoId={selectedVideo.id}
+          videoTitle={selectedVideo.title}
+        />
+      )}
     </div>
   );
 }

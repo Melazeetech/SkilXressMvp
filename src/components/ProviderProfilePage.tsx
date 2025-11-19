@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, Play } from 'lucide-react';
+import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { FollowButton } from './FollowButton';
@@ -23,6 +23,30 @@ interface ProviderProfilePageProps {
     providerId: string;
     onClose: () => void;
     onBookClick?: () => void;
+}
+
+function formatTimeAgo(dateString: string) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+    return Math.floor(seconds) + " seconds ago";
+}
+
+function formatViews(views: number) {
+    if (views >= 1000000) return (views / 1000000).toFixed(1) + 'M';
+    if (views >= 1000) return (views / 1000).toFixed(1) + 'K';
+    return views.toString();
 }
 
 export function ProviderProfilePage({ providerId, onClose, onBookClick }: ProviderProfilePageProps) {
@@ -89,7 +113,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
 
             // Calculate average rating
             if (ratingsData && ratingsData.length > 0) {
-                const avg = ratingsData.reduce((sum, r) => sum + r.rating, 0) / ratingsData.length;
+                const avg = (ratingsData as Rating[]).reduce((sum, r) => sum + r.rating, 0) / ratingsData.length;
                 setAverageRating(avg);
             }
         } catch (error) {
@@ -102,7 +126,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
     if (loading) {
         return (
             <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
             </div>
         );
     }
@@ -114,7 +138,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
                     <p className="text-xl text-gray-600">Provider not found</p>
                     <button
                         onClick={onClose}
-                        className="mt-4 text-blue-600 hover:underline"
+                        className="mt-4 text-red-600 hover:underline"
                     >
                         Go back
                     </button>
@@ -125,259 +149,281 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
 
     return (
         <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                <div className="max-w-6xl mx-auto px-4 py-8">
-                    <button
-                        onClick={onClose}
-                        className="mb-4 text-white/80 hover:text-white transition-colors"
-                    >
-                        ← Back
-                    </button>
+            {/* Navigation Bar */}
+            <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b px-4 py-3 flex items-center gap-4">
+                <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </button>
+                <h2 className="font-semibold text-lg truncate">{provider.full_name}</h2>
+            </div>
 
-                    <div className="flex items-start gap-6">
+            {/* Channel Banner */}
+            <div className="h-32 sm:h-48 bg-gradient-to-r from-gray-800 to-gray-900 w-full relative">
+                {/* Optional: Add a banner image here if available in the future */}
+            </div>
+
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Channel Header Info */}
+                <div className="flex flex-col sm:flex-row gap-6 -mt-12 mb-8 relative z-10">
+                    {/* Avatar */}
+                    <div className="flex-shrink-0 mx-auto sm:mx-0">
                         {provider.avatar_url ? (
                             <img
                                 src={provider.avatar_url}
                                 alt={provider.full_name}
-                                className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
+                                className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-md object-cover bg-white"
                             />
                         ) : (
-                            <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-white/20 flex items-center justify-center text-4xl font-bold">
+                            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-md bg-gray-100 flex items-center justify-center text-5xl font-bold text-gray-400">
                                 {provider.full_name.charAt(0)}
                             </div>
                         )}
+                    </div>
 
-                        <div className="flex-1">
-                            <h1 className="text-3xl font-bold mb-2">{provider.full_name}</h1>
-
+                    {/* Info */}
+                    <div className="flex-1 text-center sm:text-left pt-2 sm:pt-14">
+                        <h1 className="text-3xl font-bold text-gray-900 mb-1">{provider.full_name}</h1>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-gray-600 text-sm mb-4">
+                            <span className="font-medium text-black">@{provider.full_name.toLowerCase().replace(/\s+/g, '')}</span>
+                            <span>•</span>
+                            <span>{provider.followers_count || 0} subscribers</span>
+                            <span>•</span>
+                            <span>{videos.length} videos</span>
                             {provider.location && (
-                                <div className="flex items-center gap-2 text-white/90 mb-3">
-                                    <MapPin className="w-4 h-4" />
-                                    <span>{provider.location}</span>
-                                </div>
+                                <>
+                                    <span>•</span>
+                                    <span className="flex items-center gap-1">
+                                        <MapPin className="w-3 h-3" />
+                                        {provider.location}
+                                    </span>
+                                </>
                             )}
+                        </div>
 
-                            {provider.bio && (
-                                <p className="text-white/90 mb-4 max-w-2xl">{provider.bio}</p>
+                        {provider.bio && (
+                            <p className="text-gray-600 text-sm max-w-2xl mb-4 line-clamp-2 hover:line-clamp-none transition-all cursor-pointer">
+                                {provider.bio}
+                            </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                            <FollowButton
+                                providerId={providerId}
+                                initialFollowersCount={provider.followers_count || 0}
+                                className="!bg-black !text-white hover:!bg-gray-800 !rounded-full !px-6 !py-2 !font-medium !text-sm"
+                            />
+
+                            {user && user.id !== providerId && (
+                                <button
+                                    onClick={onBookClick}
+                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-medium text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    Book
+                                </button>
                             )}
-
-                            <div className="flex items-center gap-6 mb-4">
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold">{provider.followers_count || 0}</div>
-                                    <div className="text-sm text-white/80">Followers</div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold">{videos.length}</div>
-                                    <div className="text-sm text-white/80">Videos</div>
-                                </div>
-                                {averageRating > 0 && (
-                                    <div className="text-center">
-                                        <div className="text-2xl font-bold flex items-center gap-1">
-                                            <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
-                                            {averageRating.toFixed(1)}
-                                        </div>
-                                        <div className="text-sm text-white/80">{ratings.length} Reviews</div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-3">
-                                <FollowButton
-                                    providerId={providerId}
-                                    initialFollowersCount={provider.followers_count || 0}
-                                />
-                                {user && user.id !== providerId && (
-                                    <button
-                                        onClick={onBookClick}
-                                        className="px-6 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center gap-2"
-                                    >
-                                        <MessageCircle className="w-4 h-4" />
-                                        Book Service
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Tabs */}
-            <div className="border-b sticky top-0 bg-white z-10">
-                <div className="max-w-6xl mx-auto px-4">
-                    <div className="flex gap-8">
+                {/* Tabs */}
+                <div className="border-b border-gray-200 mb-6">
+                    <div className="flex gap-8 overflow-x-auto scrollbar-hide">
                         <button
                             onClick={() => setActiveTab('videos')}
-                            className={`py-4 px-2 font-medium transition-colors relative ${activeTab === 'videos'
-                                    ? 'text-blue-600'
-                                    : 'text-gray-600 hover:text-gray-900'
+                            className={`pb-3 px-1 font-medium text-sm whitespace-nowrap transition-colors relative ${activeTab === 'videos'
+                                ? 'text-black border-b-2 border-black'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
-                            <div className="flex items-center gap-2">
-                                <VideoIcon className="w-4 h-4" />
-                                Videos ({videos.length})
-                            </div>
-                            {activeTab === 'videos' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-                            )}
+                            VIDEOS
                         </button>
-
                         <button
                             onClick={() => setActiveTab('portfolio')}
-                            className={`py-4 px-2 font-medium transition-colors relative ${activeTab === 'portfolio'
-                                    ? 'text-blue-600'
-                                    : 'text-gray-600 hover:text-gray-900'
+                            className={`pb-3 px-1 font-medium text-sm whitespace-nowrap transition-colors relative ${activeTab === 'portfolio'
+                                ? 'text-black border-b-2 border-black'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
-                            <div className="flex items-center gap-2">
-                                <Briefcase className="w-4 h-4" />
-                                Portfolio ({workSamples.length})
-                            </div>
-                            {activeTab === 'portfolio' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-                            )}
+                            PORTFOLIO
                         </button>
-
                         <button
                             onClick={() => setActiveTab('reviews')}
-                            className={`py-4 px-2 font-medium transition-colors relative ${activeTab === 'reviews'
-                                    ? 'text-blue-600'
-                                    : 'text-gray-600 hover:text-gray-900'
+                            className={`pb-3 px-1 font-medium text-sm whitespace-nowrap transition-colors relative ${activeTab === 'reviews'
+                                ? 'text-black border-b-2 border-black'
+                                : 'text-gray-600 hover:text-gray-900'
                                 }`}
                         >
-                            <div className="flex items-center gap-2">
-                                <Star className="w-4 h-4" />
-                                Reviews ({ratings.length})
-                            </div>
-                            {activeTab === 'reviews' && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
-                            )}
+                            REVIEWS
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {/* Content */}
-            <div className="max-w-6xl mx-auto px-4 py-8">
-                {activeTab === 'videos' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {videos.map((video) => (
-                            <div
-                                key={video.id}
-                                className="group cursor-pointer rounded-xl overflow-hidden bg-gray-100 hover:shadow-lg transition-all duration-200"
-                            >
-                                <div className="relative aspect-video bg-gray-200">
-                                    <video
-                                        src={video.video_url}
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                        <Play className="w-12 h-12 text-white" />
+                {/* Content */}
+                <div className="pb-12">
+                    {activeTab === 'videos' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8">
+                            {videos.map((video) => (
+                                <div key={video.id} className="group cursor-pointer flex flex-col gap-2">
+                                    {/* Thumbnail */}
+                                    <div className="relative aspect-video rounded-xl overflow-hidden bg-gray-200">
+                                        <video
+                                            src={video.video_url}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                            muted
+                                            onMouseEnter={(e) => e.currentTarget.play()}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.pause();
+                                                e.currentTarget.currentTime = 0;
+                                            }}
+                                        />
+                                        {/* Duration Badge (Mock) */}
+                                        <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1 rounded font-medium">
+                                            0:30
+                                        </div>
                                     </div>
-                                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                                        {video.views_count || 0} views
+
+                                    {/* Meta */}
+                                    <div className="flex gap-3 items-start">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm leading-tight mb-1 group-hover:text-black">
+                                                {video.title}
+                                            </h3>
+                                            <div className="text-xs text-gray-600 flex flex-col">
+                                                <span>{formatViews(video.views_count || 0)} views • {formatTimeAgo(video.created_at)}</span>
+                                            </div>
+                                            <div className="mt-1">
+                                                <span className="inline-block bg-gray-100 text-gray-600 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                                                    {video.skill_categories?.name}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded-full transition-all">
+                                            <MoreVertical className="w-4 h-4 text-gray-900" />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="p-3">
-                                    <h3 className="font-medium text-gray-900 line-clamp-2 mb-1">
-                                        {video.title}
-                                    </h3>
-                                    <p className="text-sm text-gray-600">
-                                        {video.skill_categories?.name}
-                                    </p>
+                            ))}
+                            {videos.length === 0 && (
+                                <div className="col-span-full text-center py-20">
+                                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <VideoIcon className="w-10 h-10 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-gray-900">No videos yet</h3>
+                                    <p className="text-gray-500 text-sm">This provider hasn't uploaded any videos.</p>
                                 </div>
-                            </div>
-                        ))}
-                        {videos.length === 0 && (
-                            <div className="col-span-full text-center py-12 text-gray-500">
-                                No videos yet
-                            </div>
-                        )}
-                    </div>
-                )}
+                            )}
+                        </div>
+                    )}
 
-                {activeTab === 'portfolio' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {workSamples.map((sample) => (
-                            <div
-                                key={sample.id}
-                                className="group rounded-xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-200"
-                            >
-                                <div className="aspect-square bg-gray-200">
+                    {activeTab === 'portfolio' && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
+                            {workSamples.map((sample) => (
+                                <div key={sample.id} className="group relative aspect-square bg-gray-100 cursor-pointer overflow-hidden">
                                     <img
                                         src={sample.image_url}
                                         alt={sample.title}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
                                     />
-                                </div>
-                                <div className="p-4">
-                                    <h3 className="font-semibold text-gray-900 mb-2">{sample.title}</h3>
-                                    {sample.description && (
-                                        <p className="text-sm text-gray-600 line-clamp-2">
-                                            {sample.description}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {workSamples.length === 0 && (
-                            <div className="col-span-full text-center py-12 text-gray-500">
-                                No portfolio items yet
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'reviews' && (
-                    <div className="space-y-4 max-w-3xl">
-                        {ratings.map((rating) => (
-                            <div key={rating.id} className="bg-white rounded-xl p-6 shadow-md">
-                                <div className="flex items-start gap-4">
-                                    {rating.client_profile?.avatar_url ? (
-                                        <img
-                                            src={rating.client_profile.avatar_url}
-                                            alt={rating.client_profile.full_name}
-                                            className="w-12 h-12 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-600">
-                                            {rating.client_profile?.full_name.charAt(0)}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-4">
+                                        <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <h3 className="font-medium text-sm line-clamp-1">{sample.title}</h3>
                                         </div>
-                                    )}
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h4 className="font-semibold text-gray-900">
-                                                {rating.client_profile?.full_name}
-                                            </h4>
-                                            <div className="flex items-center gap-1">
+                                    </div>
+                                </div>
+                            ))}
+                            {workSamples.length === 0 && (
+                                <div className="col-span-full text-center py-20">
+                                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Briefcase className="w-10 h-10 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-gray-900">No portfolio items</h3>
+                                    <p className="text-gray-500 text-sm">This provider hasn't showcased any work yet.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'reviews' && (
+                        <div className="max-w-4xl mx-auto">
+                            {averageRating > 0 && (
+                                <div className="flex items-center gap-4 mb-8 pb-8 border-b">
+                                    <div className="text-5xl font-bold text-gray-900">{averageRating.toFixed(1)}</div>
+                                    <div>
+                                        <div className="flex items-center gap-1 mb-1">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star
+                                                    key={i}
+                                                    className={`w-5 h-5 ${i < Math.round(averageRating)
+                                                        ? 'fill-gray-900 text-gray-900'
+                                                        : 'text-gray-300'
+                                                        }`}
+                                                />
+                                            ))}
+                                        </div>
+                                        <p className="text-sm text-gray-600">{ratings.length} reviews</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-6">
+                                {ratings.map((rating) => (
+                                    <div key={rating.id} className="flex gap-4">
+                                        {rating.client_profile?.avatar_url ? (
+                                            <img
+                                                src={rating.client_profile.avatar_url}
+                                                alt={rating.client_profile.full_name}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600">
+                                                {rating.client_profile?.full_name.charAt(0)}
+                                            </div>
+                                        )}
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h4 className="font-medium text-sm text-gray-900">
+                                                    {rating.client_profile?.full_name}
+                                                </h4>
+                                                <span className="text-xs text-gray-500">
+                                                    {formatTimeAgo(rating.created_at)}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 mb-2">
                                                 {[...Array(5)].map((_, i) => (
                                                     <Star
                                                         key={i}
-                                                        className={`w-4 h-4 ${i < rating.rating
-                                                                ? 'fill-yellow-400 text-yellow-400'
-                                                                : 'text-gray-300'
+                                                        className={`w-3 h-3 ${i < rating.rating
+                                                            ? 'fill-gray-900 text-gray-900'
+                                                            : 'text-gray-300'
                                                             }`}
                                                     />
                                                 ))}
                                             </div>
+                                            {rating.review && (
+                                                <p className="text-sm text-gray-700 leading-relaxed">{rating.review}</p>
+                                            )}
                                         </div>
-                                        {rating.review && (
-                                            <p className="text-gray-700">{rating.review}</p>
-                                        )}
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            {new Date(rating.created_at).toLocaleDateString()}
-                                        </p>
                                     </div>
-                                </div>
+                                ))}
+                                {ratings.length === 0 && (
+                                    <div className="text-center py-12 text-gray-500">
+                                        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Star className="w-10 h-10 text-gray-400" />
+                                        </div>
+                                        <h3 className="text-lg font-medium text-gray-900">No reviews yet</h3>
+                                        <p className="text-gray-500 text-sm">This provider hasn't received any reviews yet.</p>
+                                    </div>
+                                )}
                             </div>
-                        ))}
-                        {ratings.length === 0 && (
-                            <div className="text-center py-12 text-gray-500">
-                                No reviews yet
-                            </div>
-                        )}
-                    </div>
-                )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Video, Calendar, CheckCircle, X, Loader2, MessageCircle, Star } from 'lucide-react';
+import { Plus, Video, Calendar, CheckCircle, X, Loader2, MessageCircle, Star, Briefcase } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
+import { PortfolioManager } from './PortfolioManager';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   client_profile: {
@@ -35,7 +36,7 @@ type Rating = Database['public']['Tables']['ratings']['Row'] & {
 };
 
 export function ProviderDashboard() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'bookings' | 'reviews'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'bookings' | 'reviews' | 'portfolio'>('videos');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -182,6 +183,16 @@ export function ProviderDashboard() {
             <Star className="w-5 h-5" />
             Reviews
           </button>
+          <button
+            onClick={() => setActiveTab('portfolio')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'portfolio'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+          >
+            <Briefcase className="w-5 h-5" />
+            Portfolio
+          </button>
         </div>
 
         {loading ? (
@@ -222,6 +233,10 @@ export function ProviderDashboard() {
                   ))
                 )}
               </div>
+            )}
+
+            {activeTab === 'portfolio' && (
+              <PortfolioManager />
             )}
 
             {activeTab === 'bookings' && (
@@ -501,8 +516,8 @@ function VideoUploadForm({
                 type="button"
                 onClick={() => setUploadMethod('file')}
                 className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'file'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 Upload File
@@ -511,8 +526,8 @@ function VideoUploadForm({
                 type="button"
                 onClick={() => setUploadMethod('url')}
                 className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'url'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 Use URL

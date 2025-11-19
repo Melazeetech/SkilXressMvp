@@ -7,12 +7,14 @@ interface FollowButtonProps {
     providerId: string;
     initialFollowersCount?: number;
     onFollowChange?: (isFollowing: boolean, newCount: number) => void;
+    className?: string;
 }
 
 export function FollowButton({
     providerId,
     initialFollowersCount = 0,
-    onFollowChange
+    onFollowChange,
+    className = ''
 }: FollowButtonProps) {
     const { user } = useAuth();
     const [isFollowing, setIsFollowing] = useState(false);
@@ -97,7 +99,7 @@ export function FollowButton({
 
                 const { data, error } = await supabase
                     .from('followers')
-                    .insert([insertData])
+                    .insert([insertData] as any)
                     .select();
 
                 if (error) {
@@ -149,7 +151,7 @@ export function FollowButton({
             className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${isFollowing
                 ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                } disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         >
             {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
