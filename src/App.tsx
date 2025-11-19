@@ -7,6 +7,9 @@ import { BookingModal } from './components/BookingModal';
 import { SearchBar } from './components/SearchBar';
 import { ProviderDashboard } from './components/ProviderDashboard';
 import { ClientDashboard } from './components/ClientDashboard';
+import { ProfileModal } from './components/ProfileModal';
+import { LandingPage } from './components/LandingPage';
+import { ProviderProfilePage } from './components/ProviderProfilePage';
 import { Database } from './lib/database.types';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
@@ -24,6 +27,9 @@ function AppContent() {
   const { user, profile, signOut, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [providerProfileOpen, setProviderProfileOpen] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [currentView, setCurrentView] = useState<'feed' | 'dashboard'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,21 +74,19 @@ function AppContent() {
               <>
                 <button
                   onClick={() => setCurrentView('feed')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentView === 'feed'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`p-2 rounded-lg transition-colors ${currentView === 'feed'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                 >
                   <Home className="w-6 h-6" />
                 </button>
                 <button
                   onClick={() => setCurrentView('dashboard')}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentView === 'dashboard'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                  className={`p-2 rounded-lg transition-colors ${currentView === 'dashboard'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                 >
                   <User className="w-6 h-6" />
                 </button>
@@ -101,6 +105,16 @@ function AppContent() {
                         {profile?.user_type}
                       </p>
                     </div>
+                    <button
+                      onClick={() => {
+                        setProfileModalOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-gray-50 text-gray-700"
+                    >
+                      <User className="w-4 h-4" />
+                      Edit Profile
+                    </button>
                     <button
                       onClick={() => {
                         signOut();
@@ -143,24 +157,13 @@ function AppContent() {
                 categoryFilter={categoryFilter}
                 locationFilter={locationFilter}
                 onBookClick={handleBookClick}
+                onProviderClick={(providerId) => {
+                  setSelectedProviderId(providerId);
+                  setProviderProfileOpen(true);
+                }}
               />
             ) : (
-              <div className="flex items-center justify-center h-[calc(100vh-56px)] px-4">
-                <div className="text-center max-w-md">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    Welcome to SkilXpress
-                  </h1>
-                  <p className="text-lg text-gray-600 mb-8">
-                    Discover and book skilled service providers through engaging videos
-                  </p>
-                  <button
-                    onClick={() => setAuthModalOpen(true)}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium text-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Get Started
-                  </button>
-                </div>
-              </div>
+              <LandingPage onGetStarted={() => setAuthModalOpen(true)} />
             )}
           </>
         ) : (
@@ -175,11 +178,29 @@ function AppContent() {
       </main>
 
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
       <BookingModal
         isOpen={bookingModalOpen}
         onClose={() => setBookingModalOpen(false)}
         video={selectedVideo}
       />
+
+      {selectedProviderId && (
+        <ProviderProfilePage
+          providerId={selectedProviderId}
+          onClose={() => {
+            setSelectedProviderId(null);
+            setProviderProfileOpen(false);
+          }}
+          onBookClick={() => {
+            setSelectedProviderId(null);
+            setProviderProfileOpen(false);
+            if (selectedVideo) {
+              setBookingModalOpen(true);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

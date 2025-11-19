@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Plus, Video, Calendar, CheckCircle, X, Loader2 } from 'lucide-react';
+import { Plus, Video, Calendar, CheckCircle, X, Loader2, MessageCircle, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
+import { Chat } from './Chat';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   client_profile: {
+    full_name: string;
+    avatar_url: string | null;
+  };
+  provider_profile: {
     full_name: string;
     avatar_url: string | null;
   };
@@ -22,13 +27,23 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
 
 type Category = Database['public']['Tables']['skill_categories']['Row'];
 
+type Rating = Database['public']['Tables']['ratings']['Row'] & {
+  client_profile: {
+    full_name: string;
+    avatar_url: string | null;
+  };
+};
+
 export function ProviderDashboard() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'bookings'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'bookings' | 'reviews'>('videos');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showChat, setShowChat] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -56,12 +71,16 @@ export function ProviderDashboard() {
 
         setVideos(videosData || []);
         setCategories(categoriesData || []);
-      } else {
+      } else if (activeTab === 'bookings') {
         const { data: bookingsData } = await supabase
           .from('bookings')
           .select(`
             *,
             client_profile:profiles!bookings_client_id_fkey (
+              full_name,
+              avatar_url
+            ),
+            provider_profile:profiles!bookings_provider_id_fkey (
               full_name,
               avatar_url
             ),
@@ -71,6 +90,20 @@ export function ProviderDashboard() {
           .order('created_at', { ascending: false });
 
         setBookings(bookingsData || []);
+      } else if (activeTab === 'reviews') {
+        const { data: ratingsData } = await supabase
+          .from('ratings')
+          .select(`
+            *,
+            client_profile:profiles!ratings_client_id_fkey (
+              full_name,
+              avatar_url
+            )
+          `)
+          .eq('provider_id', user.id)
+          .order('created_at', { ascending: false });
+
+        setRatings(ratingsData || []);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -79,10 +112,10 @@ export function ProviderDashboard() {
     }
   };
 
-  const handleStatusUpdate = async (bookingId: string, newStatus: string) => {
+  const handleStatusUpdate = async (bookingId: string, newStatus: Database['public']['Tables']['bookings']['Row']['status']) => {
     try {
-      const { error } = await supabase
-        .from('bookings')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('bookings') as any)
         .update({ status: newStatus })
         .eq('id', bookingId);
 
@@ -92,6 +125,15 @@ export function ProviderDashboard() {
       console.error('Error updating booking:', error);
     }
   };
+
+  const handleOpenChat = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setShowChat(true);
+  };
+
+  if (showChat && selectedBooking) {
+    return <Chat booking={selectedBooking} onClose={() => setShowChat(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,28 +151,36 @@ export function ProviderDashboard() {
           )}
         </div>
 
-        <div className="flex gap-4 mb-6">
+        <div className="flex gap-4 mb-6 overflow-x-auto pb-2">
           <button
             onClick={() => setActiveTab('videos')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === 'videos'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'videos'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <Video className="w-5 h-5" />
             My Videos
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
-              activeTab === 'bookings'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'bookings'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             <Calendar className="w-5 h-5" />
             Bookings
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'reviews'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+          >
+            <Star className="w-5 h-5" />
+            Reviews
           </button>
         </div>
 
@@ -219,15 +269,14 @@ export function ProviderDashboard() {
                           </div>
                         </div>
                         <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${
-                            booking.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : booking.status === 'confirmed'
+                          className={`px-3 py-1 rounded-full text-sm font-medium ${booking.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : booking.status === 'confirmed'
                               ? 'bg-blue-100 text-blue-800'
                               : booking.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
                         >
                           {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                         </span>
@@ -239,27 +288,35 @@ export function ProviderDashboard() {
                         </p>
                       )}
 
-                      {booking.status === 'pending' && (
-                        <div className="mt-4 flex gap-3">
-                          <button
-                            onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                            Decline
-                          </button>
-                        </div>
-                      )}
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <button
+                          onClick={() => handleOpenChat(booking)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Chat
+                        </button>
 
-                      {booking.status === 'confirmed' && (
-                        <div className="mt-4">
+                        {booking.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                              Decline
+                            </button>
+                          </>
+                        )}
+
+                        {booking.status === 'confirmed' && (
                           <button
                             onClick={() => handleStatusUpdate(booking.id, 'completed')}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -267,7 +324,65 @@ export function ProviderDashboard() {
                             <CheckCircle className="w-4 h-4" />
                             Mark as Completed
                           </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="space-y-4">
+                {ratings.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Star className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p>No reviews yet</p>
+                  </div>
+                ) : (
+                  ratings.map((rating) => (
+                    <div
+                      key={rating.id}
+                      className="bg-white rounded-lg p-6 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center">
+                          {rating.client_profile.avatar_url ? (
+                            <img
+                              src={rating.client_profile.avatar_url}
+                              alt={rating.client_profile.full_name}
+                              className="w-10 h-10 rounded-full mr-3"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 mr-3 flex items-center justify-center">
+                              <span className="font-bold text-gray-600">
+                                {rating.client_profile.full_name.charAt(0)}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="font-semibold">
+                              {rating.client_profile.full_name}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {new Date(rating.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-4 h-4 ${star <= rating.rating
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-gray-300'
+                                }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {rating.review && (
+                        <p className="text-gray-600 mt-2">{rating.review}</p>
                       )}
                     </div>
                   ))
@@ -301,45 +416,110 @@ function VideoUploadForm({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
+  const [videoPreview, setVideoPreview] = useState<string>('');
+  const [uploadMethod, setUploadMethod] = useState<'file' | 'url'>('file');
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { user } = useAuth();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setVideoFile(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setVideoPreview(previewUrl);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
+    setUploadProgress(0);
+
     try {
-      const { error } = await supabase.from('skill_videos').insert({
+      let finalVideoUrl = videoUrl;
+
+      // If uploading a file, upload it first
+      if (uploadMethod === 'file' && videoFile) {
+        const { uploadVideo } = await import('../lib/uploadHelpers');
+        finalVideoUrl = await uploadVideo(videoFile, user.id, (progress) => {
+          setUploadProgress(progress);
+        });
+      }
+
+      const videoData: Database['public']['Tables']['skill_videos']['Insert'] = {
         provider_id: user.id,
         category_id: categoryId,
-        video_url: videoUrl,
+        video_url: finalVideoUrl,
         title,
-        description,
-      });
+        description: description || null,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('skill_videos') as any).insert(videoData);
 
       if (error) throw error;
+
+      // Clean up preview URL
+      if (videoPreview) {
+        URL.revokeObjectURL(videoPreview);
+      }
+
       onClose();
     } catch (error) {
       console.error('Error uploading video:', error);
-      alert('Failed to upload video');
+      alert(error instanceof Error ? error.message : 'Failed to upload video');
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">Upload Video</h2>
-          <button onClick={onClose}>
+          <button onClick={onClose} disabled={loading}>
             <X className="w-6 h-6 text-gray-400" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Upload Method Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Upload Method
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setUploadMethod('file')}
+                className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'file'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                  }`}
+              >
+                Upload File
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadMethod('url')}
+                className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'url'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                  }`}
+              >
+                Use URL
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Title
@@ -372,22 +552,50 @@ function VideoUploadForm({
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Video URL
-            </label>
-            <input
-              type="url"
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              For demo purposes, use a public video URL
-            </p>
-          </div>
+          {uploadMethod === 'file' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Video File
+              </label>
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                onChange={handleFileChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required={uploadMethod === 'file'}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Max 50MB. Supported formats: MP4, WebM, MOV
+              </p>
+
+              {videoPreview && (
+                <div className="mt-3">
+                  <video
+                    src={videoPreview}
+                    controls
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Video URL
+              </label>
+              <input
+                type="url"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required={uploadMethod === 'url'}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Paste a public video URL
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -400,6 +608,21 @@ function VideoUploadForm({
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {loading && uploadProgress > 0 && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Uploading...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

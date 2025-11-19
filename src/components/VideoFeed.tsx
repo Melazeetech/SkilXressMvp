@@ -22,9 +22,10 @@ interface VideoFeedProps {
   searchQuery?: string;
   locationFilter?: string;
   onBookClick: (video: Video) => void;
+  onProviderClick?: (providerId: string) => void;
 }
 
-export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick }: VideoFeedProps) {
+export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick, onProviderClick }: VideoFeedProps) {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -111,8 +112,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
       const filteredVideos = locationFilter
         ? videosWithLikes.filter(v =>
-            v.profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
-          )
+          v.profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
+        )
         : videosWithLikes;
 
       setVideos(filteredVideos);
@@ -147,10 +148,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         prev.map(v =>
           v.id === video.id
             ? {
-                ...v,
-                user_liked: !v.user_liked,
-                likes_count: v.user_liked ? v.likes_count - 1 : v.likes_count + 1,
-              }
+              ...v,
+              user_liked: !v.user_liked,
+              likes_count: v.user_liked ? v.likes_count - 1 : v.likes_count + 1,
+            }
             : v
         )
       );
@@ -231,7 +232,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                     </div>
                   )}
                   <div>
-                    <h3 className="font-semibold text-lg">
+                    <h3
+                      className="font-semibold text-lg cursor-pointer hover:underline"
+                      onClick={() => onProviderClick?.(video.provider_id)}
+                    >
                       {video.profiles?.full_name}
                     </h3>
                     <p className="text-sm text-gray-200">
@@ -278,9 +282,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                   className="flex flex-col items-center disabled:opacity-50"
                 >
                   <Heart
-                    className={`w-8 h-8 ${
-                      video.user_liked ? 'fill-red-500 text-red-500' : 'text-white'
-                    }`}
+                    className={`w-8 h-8 ${video.user_liked ? 'fill-red-500 text-red-500' : 'text-white'
+                      }`}
                   />
                   <span className="text-xs mt-1">{video.likes_count}</span>
                 </button>

@@ -19,6 +19,8 @@ export interface Database {
           bio: string | null
           phone: string | null
           location: string | null
+          followers_count: number
+          following_count: number
           created_at: string
           updated_at: string
         }
@@ -31,6 +33,8 @@ export interface Database {
           bio?: string | null
           phone?: string | null
           location?: string | null
+          followers_count?: number
+          following_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -43,6 +47,8 @@ export interface Database {
           bio?: string | null
           phone?: string | null
           location?: string | null
+          followers_count?: number
+          following_count?: number
           created_at?: string
           updated_at?: string
         }
@@ -248,6 +254,55 @@ export interface Database {
           rating?: number
           review?: string | null
           created_at?: string
+        }
+      }
+      followers: {
+        Row: {
+          id: string
+          follower_id: string
+          following_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          follower_id: string
+          following_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          follower_id?: string
+          following_id?: string
+          created_at?: string
+        }
+      }
+      work_samples: {
+        Row: {
+          id: string
+          provider_id: string
+          title: string
+          description: string | null
+          image_url: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          provider_id: string
+          title: string
+          description?: string | null
+          image_url: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          provider_id?: string
+          title?: string
+          description?: string | null
+          image_url?: string
+          created_at?: string
+          updated_at?: string
         }
       }
     }
