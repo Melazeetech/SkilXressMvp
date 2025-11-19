@@ -1,5 +1,5 @@
 /*
-  # SkilXpress Database Schema
+  # SkilXpress Database Schemaa
 
   1. New Tables
     - `profiles`
