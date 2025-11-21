@@ -496,12 +496,16 @@ function VideoUploadForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 my-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Upload Video</h2>
-          <button onClick={onClose} disabled={loading}>
-            <X className="w-6 h-6 text-gray-400" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-bold">Upload Video</h2>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 hover:text-gray-600" />
           </button>
         </div>
 
@@ -515,7 +519,7 @@ function VideoUploadForm({
               <button
                 type="button"
                 onClick={() => setUploadMethod('file')}
-                className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'file'
+                className={`px-3 sm:px-4 py-2 rounded-lg border-2 font-medium transition-colors text-sm sm:text-base ${uploadMethod === 'file'
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -525,7 +529,7 @@ function VideoUploadForm({
               <button
                 type="button"
                 onClick={() => setUploadMethod('url')}
-                className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'url'
+                className={`px-3 sm:px-4 py-2 rounded-lg border-2 font-medium transition-colors text-sm sm:text-base ${uploadMethod === 'url'
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300'
                   }`}
