@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, User, LogOut, Menu, X, MessageSquare, Bell } from 'lucide-react';
+import { Home, User, LogOut, Menu, X, MessageSquare, Bell, Search } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { VideoFeed } from './components/VideoFeed';
@@ -40,6 +40,7 @@ function AppContent() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -47,6 +48,7 @@ function AppContent() {
   useBackHandler(authModalOpen, () => setAuthModalOpen(false), 'auth-modal');
   useBackHandler(bookingModalOpen, () => setBookingModalOpen(false), 'booking-modal');
   useBackHandler(profileModalOpen, () => setProfileModalOpen(false), 'profile-modal');
+  useBackHandler(searchModalOpen, () => setSearchModalOpen(false), 'search-modal');
   useBackHandler(providerProfileOpen, () => {
     setProviderProfileOpen(false);
     setSelectedProviderId(null);
@@ -123,6 +125,14 @@ function AppContent() {
     setBookingModalOpen(true);
   };
 
+  const handleHomeClick = () => {
+    setCurrentView('feed');
+    setSearchQuery('');
+    setCategoryFilter('');
+    setLocationFilter('');
+    setSearchModalOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -135,13 +145,13 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && user ? 'bg-transparent' : 'bg-white border-b border-gray-200'
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && user ? 'bg-transparent' : 'bg-blue-600 shadow-md'
         }`}>
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setCurrentView('feed')}
-              className={`text-xl font-bold ${currentView === 'feed' && user ? 'text-white drop-shadow-md' : 'text-blue-600'}`}
+              onClick={handleHomeClick}
+              className={`text-xl font-bold text-white drop-shadow-md`}
             >
               SkilXpress
             </button>
@@ -151,19 +161,22 @@ function AppContent() {
             {user ? (
               <>
                 <button
-                  onClick={() => setCurrentView('feed')}
-                  className={`p-2 rounded-full transition-colors ${currentView === 'feed'
-                    ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                  onClick={handleHomeClick}
+                  className={`p-2 rounded-full transition-colors text-white hover:bg-white/20`}
                 >
                   <Home className="w-5 h-5" />
                 </button>
                 <button
+                  onClick={() => setSearchModalOpen(true)}
+                  className={`p-2 rounded-full transition-colors text-white hover:bg-white/20`}
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+                <button
                   onClick={() => setCurrentView('messages')}
                   className={`p-2 rounded-full transition-colors ${currentView === 'messages'
-                    ? 'bg-blue-50 text-blue-600'
-                    : currentView === 'feed' ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-white/20 text-white'
+                    : 'text-white hover:bg-white/20'
                     }`}
                 >
                   <MessageSquare className="w-5 h-5" />
@@ -231,7 +244,7 @@ function AppContent() {
             ) : (
               <button
                 onClick={() => setAuthModalOpen(true)}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="bg-white text-blue-600 px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors shadow-sm"
               >
                 Sign In
               </button>
@@ -243,17 +256,7 @@ function AppContent() {
       <main className={`${currentView === 'feed' && user ? 'pt-0' : 'pt-14'}`}>
         {currentView === 'feed' ? (
           <>
-            {user && (
-              <div className="fixed top-14 left-0 right-0 z-40 px-4 pointer-events-none">
-                <div className="max-w-md mx-auto pointer-events-auto">
-                  <SearchBar
-                    onSearch={setSearchQuery}
-                    onCategoryFilter={setCategoryFilter}
-                    onLocationFilter={setLocationFilter}
-                  />
-                </div>
-              </div>
-            )}
+
             {user ? (
               <VideoFeed
                 searchQuery={searchQuery}
@@ -312,6 +315,15 @@ function AppContent() {
             setActiveBookingId(bookingId);
             setCurrentView('messages');
           }}
+        />
+      )}
+
+      {searchModalOpen && (
+        <SearchBar
+          onSearch={setSearchQuery}
+          onCategoryFilter={setCategoryFilter}
+          onLocationFilter={setLocationFilter}
+          onClose={() => setSearchModalOpen(false)}
         />
       )}
     </div>
