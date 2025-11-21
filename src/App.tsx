@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Home, User, LogOut, Menu, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Home, User, LogOut, Menu, X, MessageSquare, Bell } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { VideoFeed } from './components/VideoFeed';
@@ -10,7 +10,11 @@ import { ClientDashboard } from './components/ClientDashboard';
 import { ProfileModal } from './components/ProfileModal';
 import { LandingPage } from './components/LandingPage';
 import { ProviderProfilePage } from './components/ProviderProfilePage';
+import { MessagesView } from './components/MessagesView';
+import { NotificationsView } from './components/NotificationsView';
 import { Database } from './lib/database.types';
+import { useBackHandler } from './hooks/useBackHandler';
+import { supabase } from './lib/supabase';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -31,11 +35,84 @@ function AppContent() {
   const [providerProfileOpen, setProviderProfileOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [currentView, setCurrentView] = useState<'feed' | 'dashboard'>('feed');
+  const [currentView, setCurrentView] = useState<'feed' | 'dashboard' | 'messages' | 'notifications'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Handle back button for modals and views
+  useBackHandler(authModalOpen, () => setAuthModalOpen(false), 'auth-modal');
+  useBackHandler(bookingModalOpen, () => setBookingModalOpen(false), 'booking-modal');
+  useBackHandler(profileModalOpen, () => setProfileModalOpen(false), 'profile-modal');
+  useBackHandler(providerProfileOpen, () => {
+    setProviderProfileOpen(false);
+    setSelectedProviderId(null);
+  }, 'provider-profile');
+  useBackHandler(currentView === 'dashboard' || currentView === 'messages' || currentView === 'notifications', () => {
+    setCurrentView('feed');
+    setActiveBookingId(null);
+  }, 'main-view');
+
+  useEffect(() => {
+    if (user) {
+      checkUnreadNotifications();
+    }
+  }, [user, currentView]); // Re-check when view changes (e.g. leaving notifications view)
+
+  const checkUnreadNotifications = async () => {
+    if (!user) return;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('last_read_notifications_at')
+        .eq('id', user.id)
+        .single();
+
+      const lastReadAt = (profile as any)?.last_read_notifications_at || new Date(0).toISOString();
+
+      let totalUnread = 0;
+
+      // 1. Likes
+      const { data: myVideos } = await supabase
+        .from('skill_videos')
+        .select('id')
+        .eq('provider_id', user.id);
+
+      if (myVideos && myVideos.length > 0) {
+        const videoIds = (myVideos as any[]).map(v => v.id);
+        const { count } = await supabase
+          .from('video_likes')
+          .select('id', { count: 'exact', head: true })
+          .in('video_id', videoIds)
+          .gt('created_at', lastReadAt);
+        totalUnread += (count || 0);
+      }
+
+      // 2. Followers
+      const { count: followersCount } = await supabase
+        .from('followers')
+        .select('id', { count: 'exact', head: true })
+        .eq('following_id', user.id)
+        .gt('created_at', lastReadAt);
+      totalUnread += (followersCount || 0);
+
+      // 3. Bookings
+      const { count: bookingsCount } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .or(`client_id.eq.${user.id},provider_id.eq.${user.id}`)
+        .gt('created_at', lastReadAt);
+      totalUnread += (bookingsCount || 0);
+
+      setUnreadCount(totalUnread);
+
+    } catch (error) {
+      console.error("Error checking unread notifications:", error);
+    }
+  };
 
   const handleBookClick = (video: Video) => {
     if (!user) {
@@ -58,12 +135,13 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-40">
-        <div className="flex items-center justify-between px-4 py-3">
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && user ? 'bg-transparent' : 'bg-white border-b border-gray-200'
+        }`}>
+        <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setCurrentView('feed')}
-              className="text-2xl font-bold text-blue-600"
+              className={`text-xl font-bold ${currentView === 'feed' && user ? 'text-white drop-shadow-md' : 'text-blue-600'}`}
             >
               SkilXpress
             </button>
@@ -74,27 +152,48 @@ function AppContent() {
               <>
                 <button
                   onClick={() => setCurrentView('feed')}
-                  className={`p-2 rounded-lg transition-colors ${currentView === 'feed'
-                    ? 'bg-blue-50 text-blue-600'
+                  className={`p-2 rounded-full transition-colors ${currentView === 'feed'
+                    ? 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
                     : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
-                  <Home className="w-6 h-6" />
+                  <Home className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setCurrentView('messages')}
+                  className={`p-2 rounded-full transition-colors ${currentView === 'messages'
+                    ? 'bg-blue-50 text-blue-600'
+                    : currentView === 'feed' ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setCurrentView('notifications')}
+                  className={`p-2 rounded-full transition-colors relative ${currentView === 'notifications'
+                    ? 'bg-blue-50 text-blue-600'
+                    : currentView === 'feed' ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                  )}
                 </button>
                 <button
                   onClick={() => setCurrentView('dashboard')}
-                  className={`p-2 rounded-lg transition-colors ${currentView === 'dashboard'
+                  className={`p-2 rounded-full transition-colors ${currentView === 'dashboard'
                     ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    : currentView === 'feed' ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
-                  <User className="w-6 h-6" />
+                  <User className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+                  className={`p-2 rounded-full transition-colors ${currentView === 'feed' ? 'text-white hover:bg-white/20' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
-                  {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                  {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>
 
                 {menuOpen && (
@@ -141,15 +240,19 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="pt-14">
+      <main className={`${currentView === 'feed' && user ? 'pt-0' : 'pt-14'}`}>
         {currentView === 'feed' ? (
           <>
             {user && (
-              <SearchBar
-                onSearch={setSearchQuery}
-                onCategoryFilter={setCategoryFilter}
-                onLocationFilter={setLocationFilter}
-              />
+              <div className="fixed top-14 left-0 right-0 z-40 px-4 pointer-events-none">
+                <div className="max-w-md mx-auto pointer-events-auto">
+                  <SearchBar
+                    onSearch={setSearchQuery}
+                    onCategoryFilter={setCategoryFilter}
+                    onLocationFilter={setLocationFilter}
+                  />
+                </div>
+              </div>
             )}
             {user ? (
               <VideoFeed
@@ -166,6 +269,10 @@ function AppContent() {
               <LandingPage onGetStarted={() => setAuthModalOpen(true)} />
             )}
           </>
+        ) : currentView === 'messages' ? (
+          <MessagesView activeBookingId={activeBookingId} />
+        ) : currentView === 'notifications' ? (
+          <NotificationsView />
         ) : (
           <>
             {profile?.user_type === 'provider' ? (
@@ -199,17 +306,31 @@ function AppContent() {
               setBookingModalOpen(true);
             }
           }}
+          onMessageClick={(bookingId) => {
+            setSelectedProviderId(null);
+            setProviderProfileOpen(false);
+            setActiveBookingId(bookingId);
+            setCurrentView('messages');
+          }}
         />
       )}
     </div>
   );
 }
 
+import { Toaster } from 'react-hot-toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// ... existing imports ...
+
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+        <Toaster position="top-center" />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

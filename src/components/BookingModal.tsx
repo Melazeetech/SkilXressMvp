@@ -3,6 +3,7 @@ import { X, Loader2, Calendar, Clock, MapPin, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
+import { toast } from 'react-hot-toast';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -28,37 +29,34 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const { user } = useAuth();
 
-  const { user, profile } = useAuth();
-
-  if (!isOpen || !video) return null;
+  const today = new Date().toISOString().split('T')[0];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !profile) return;
+    if (!user || !video) return;
 
-    setError('');
     setLoading(true);
-
     try {
-      const { error: bookingError } = await supabase
+      const { error } = await supabase
         .from('bookings')
         .insert({
           client_id: user.id,
           provider_id: video.provider_id,
-          video_id: video.id,
           category_id: video.category_id,
+          status: 'pending',
           preferred_date: preferredDate,
           preferred_time: preferredTime,
-          location,
-          notes,
-          status: 'pending',
+          location: location,
+          notes: notes
         });
 
-      if (bookingError) throw bookingError;
-
+      if (error) throw error;
       setSuccess(true);
+      toast.success('Booking request sent successfully!');
+
+      // Reset form after delay
       setTimeout(() => {
         onClose();
         setSuccess(false);
@@ -67,14 +65,15 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
         setLocation('');
         setNotes('');
       }, 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      toast.error('Failed to create booking. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  if (!isOpen || !video) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -189,12 +188,6 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
-              {error && (
-                <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
-                  {error}
-                </div>
-              )}
 
               <button
                 type="submit"

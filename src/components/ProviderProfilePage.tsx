@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
@@ -23,6 +24,7 @@ interface ProviderProfilePageProps {
     providerId: string;
     onClose: () => void;
     onBookClick?: () => void;
+    onMessageClick?: (bookingId: string) => void;
 }
 
 function formatTimeAgo(dateString: string) {
@@ -49,7 +51,7 @@ function formatViews(views: number) {
     return views.toString();
 }
 
-export function ProviderProfilePage({ providerId, onClose, onBookClick }: ProviderProfilePageProps) {
+export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessageClick }: ProviderProfilePageProps) {
     const [provider, setProvider] = useState<Profile | null>(null);
     const [videos, setVideos] = useState<Video[]>([]);
     const [workSamples, setWorkSamples] = useState<WorkSample[]>([]);
@@ -57,6 +59,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
     const [activeTab, setActiveTab] = useState<'videos' | 'portfolio' | 'reviews'>('videos');
     const [loading, setLoading] = useState(true);
     const [averageRating, setAverageRating] = useState(0);
+    const [messageLoading, setMessageLoading] = useState(false);
     const { user } = useAuth();
 
     useEffect(() => {
@@ -85,7 +88,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
                 .eq('provider_id', providerId)
                 .order('created_at', { ascending: false });
 
-            setVideos(videosData || []);
+            setVideos(videosData as Video[] || []);
 
             // Load work samples
             const { data: samplesData } = await supabase
@@ -109,24 +112,76 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
                 .eq('provider_id', providerId)
                 .order('created_at', { ascending: false });
 
-            setRatings(ratingsData || []);
+            // Cast ratingsData to Rating[] to avoid type errors
+            const typedRatings = (ratingsData as unknown as Rating[]) || [];
+            setRatings(typedRatings);
 
             // Calculate average rating
-            if (ratingsData && ratingsData.length > 0) {
-                const avg = (ratingsData as Rating[]).reduce((sum, r) => sum + r.rating, 0) / ratingsData.length;
+            if (typedRatings.length > 0) {
+                const avg = typedRatings.reduce((acc, curr) => acc + curr.rating, 0) / typedRatings.length;
                 setAverageRating(avg);
             }
         } catch (error) {
             console.error('Error loading provider data:', error);
+            toast.error('Failed to load provider profile');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleMessageClick = async () => {
+        if (!user || !onMessageClick) return;
+
+        setMessageLoading(true);
+        try {
+            // Check if there's an existing conversation (booking)
+            const { data: existingBooking } = await supabase
+                .from('bookings')
+                .select('id')
+                .eq('client_id', user.id)
+                .eq('provider_id', providerId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (existingBooking) {
+                onMessageClick(existingBooking.id);
+            } else {
+                // Create a new "inquiry" booking to start conversation
+                const { data: newBooking, error } = await supabase
+                    .from('bookings')
+                    .insert({
+                        client_id: user.id,
+                        provider_id: providerId,
+                        category_id: videos[0]?.category_id || '',
+                        status: 'pending',
+                        preferred_date: new Date().toISOString().split('T')[0],
+                        preferred_time: '12:00 PM',
+                        location: 'To be determined',
+                        notes: 'Inquiry started from profile'
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                if (newBooking) {
+                    onMessageClick(newBooking.id);
+                    toast.success('Conversation started!');
+                }
+            }
+        } catch (error) {
+            console.error('Error starting conversation:', error);
+            toast.error('Failed to start conversation');
+        } finally {
+            setMessageLoading(false);
         }
     };
 
     if (loading) {
         return (
             <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
         );
     }
@@ -219,13 +274,22 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick }: Provid
                             />
 
                             {user && user.id !== providerId && (
-                                <button
-                                    onClick={onBookClick}
-                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-medium text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
-                                >
-                                    <MessageCircle className="w-4 h-4" />
-                                    Book
-                                </button>
+                                <>
+                                    <button
+                                        onClick={handleMessageClick}
+                                        disabled={messageLoading}
+                                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-medium text-sm hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {messageLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                                        Message
+                                    </button>
+                                    <button
+                                        onClick={onBookClick}
+                                        className="px-6 py-2 bg-blue-600 text-white rounded-full font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                    >
+                                        Book
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

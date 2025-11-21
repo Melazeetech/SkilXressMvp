@@ -21,6 +21,7 @@ export interface Database {
           location: string | null
           followers_count: number
           following_count: number
+          last_read_notifications_at?: string
           created_at: string
           updated_at: string
         }

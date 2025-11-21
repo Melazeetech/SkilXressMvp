@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, Volume2, VolumeX } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, Volume2, VolumeX, MessageCircle, Plus, Play } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
 import { ShareModal } from './ShareModal';
+import { HeartOverlay } from './HeartOverlay';
+import { ReviewsSheet } from './ReviewsSheet';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -16,6 +19,7 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   };
   user_liked?: boolean;
   average_rating?: number;
+  is_following?: boolean;
 };
 
 interface VideoFeedProps {
@@ -34,8 +38,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [heartAnimations, setHeartAnimations] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const { user } = useAuth();
+
+  useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
 
   useEffect(() => {
     loadVideos();
@@ -50,7 +59,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             if (playPromise !== undefined) {
               playPromise.catch((error) => {
                 console.log("Autoplay prevented:", error);
-                // If autoplay fails (usually due to unmuted), mute and try again
                 if (!video.muted) {
                   setIsMuted(true);
                   video.muted = true;
@@ -58,6 +66,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 }
               });
             }
+            setIsPlaying(true);
           } else {
             video.pause();
             video.currentTime = 0;
@@ -70,6 +79,15 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsMuted(!isMuted);
+  };
+
+  const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.paused) {
+      video.play();
+    } else {
+      video.pause();
+    }
   };
 
   const loadVideos = async () => {
@@ -102,7 +120,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       if (error) throw error;
 
       const videosWithLikes = await Promise.all(
-        (data || []).map(async (video) => {
+        ((data as any[]) || []).map(async (video) => {
           let userLiked = false;
           if (user) {
             const { data: likeData } = await supabase
@@ -120,19 +138,31 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             .eq('provider_id', video.provider_id);
 
           const averageRating = ratingsData && ratingsData.length > 0
-            ? ratingsData.reduce((sum, r) => sum + r.rating, 0) / ratingsData.length
+            ? (ratingsData as any[]).reduce((sum, r) => sum + r.rating, 0) / ratingsData.length
             : 0;
+
+          let isFollowing = false;
+          if (user) {
+            const { data: followData } = await supabase
+              .from('followers')
+              .select('id')
+              .eq('follower_id', user.id)
+              .eq('provider_id', video.provider_id)
+              .maybeSingle();
+            isFollowing = !!followData;
+          }
 
           return {
             ...video,
             user_liked: userLiked,
             average_rating: averageRating,
+            is_following: isFollowing,
           };
         })
       );
 
       const filteredVideos = locationFilter
-        ? videosWithLikes.filter(v =>
+        ? videosWithLikes.filter((v: Video) =>
           v.profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
         )
         : videosWithLikes;
@@ -162,7 +192,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           .insert({
             video_id: video.id,
             user_id: user.id,
-          });
+          } as any);
       }
 
       setVideos(prev =>
@@ -180,6 +210,49 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       console.error('Error liking video:', error);
     } finally {
       setLiking(false);
+    }
+  };
+
+  const handleDoubleTap = (e: React.MouseEvent, video: Video) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setHeartAnimations(prev => [...prev, { id: Date.now(), x, y }]);
+
+    if (!video.user_liked) {
+      handleLike(video);
+    }
+  };
+
+  const handleFollow = async (video: Video) => {
+    if (!user) return;
+
+    try {
+      if (video.is_following) {
+        await supabase
+          .from('followers')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('provider_id', video.provider_id);
+      } else {
+        await supabase
+          .from('followers')
+          .insert({
+            follower_id: user.id,
+            provider_id: video.provider_id,
+          } as any);
+      }
+
+      setVideos(prev =>
+        prev.map(v =>
+          v.provider_id === video.provider_id
+            ? { ...v, is_following: !v.is_following }
+            : v
+        )
+      );
+    } catch (error) {
+      console.error('Error toggling follow:', error);
     }
   };
 
@@ -230,103 +303,158 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             loop
             playsInline
             muted={isMuted}
-            onDoubleClick={() => handleLike(video)}
+            onClick={handleVideoClick}
+            onPlay={() => index === currentIndex && setIsPlaying(true)}
+            onPause={() => index === currentIndex && setIsPlaying(false)}
+            onDoubleClick={(e) => handleDoubleTap(e, video)}
           />
 
-          {/* Volume Control */}
-          <button
-            onClick={toggleMute}
-            className="absolute top-20 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors z-10"
-          >
-            {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-          </button>
+          {/* Play Icon Overlay */}
+          {!isPlaying && index === currentIndex && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+              <div className="bg-black/40 p-4 rounded-full backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                <Play className="w-12 h-12 text-white fill-white" />
+              </div>
+            </div>
+          )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          {/* Heart Animations */}
+          {heartAnimations.map(anim => (
+            <HeartOverlay
+              key={anim.id}
+              x={anim.x}
+              y={anim.y}
+              onComplete={() => setHeartAnimations(prev => prev.filter(a => a.id !== anim.id))}
+            />
+          ))}
 
-          <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-6 text-white">
-            <div className="flex items-start justify-between">
+          {/* Gradient Overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none" />
+
+          {/* Right Side Actions */}
+          <div className="absolute bottom-20 right-4 flex flex-col items-center gap-6 z-20">
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => handleLike(video)}
+                disabled={liking}
+                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+              >
+                <Heart
+                  className={`w-8 h-8 ${video.user_liked ? 'fill-red-500 text-red-500' : 'text-white'}`}
+                />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">{video.likes_count}</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setSelectedVideo(video);
+                  setReviewsOpen(true);
+                }}
+                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+              >
+                <MessageCircle className="w-8 h-8 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">Reviews</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setSelectedVideo(video);
+                  setShareModalOpen(true);
+                }}
+                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+              >
+                <Share2 className="w-8 h-8 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">Share</span>
+            </div>
+
+            <button
+              onClick={toggleMute}
+              className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+            >
+              {isMuted ? <VolumeX className="w-8 h-8 text-white" /> : <Volume2 className="w-8 h-8 text-white" />}
+            </button>
+          </div>
+
+          {/* Bottom Info Section */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 pb-20 sm:pb-8 text-white z-10">
+            <div className="flex items-end justify-between max-w-[85%]">
               <div className="flex-1">
-                <div className="flex items-center mb-2">
-                  {video.profiles?.avatar_url ? (
-                    <img
-                      src={video.profiles.avatar_url}
-                      alt={video.profiles.full_name}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white mr-2 sm:mr-3"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-700 border-2 border-white mr-2 sm:mr-3 flex items-center justify-center">
-                      <span className="text-base sm:text-lg font-bold">
-                        {video.profiles?.full_name.charAt(0)}
-                      </span>
-                    </div>
-                  )}
+                <div className="flex items-center mb-3 cursor-pointer" onClick={() => onProviderClick?.(video.provider_id)}>
+                  <div className="relative mr-3">
+                    {video.profiles?.avatar_url ? (
+                      <img
+                        src={video.profiles.avatar_url}
+                        alt={video.profiles.full_name}
+                        className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white flex items-center justify-center shadow-md">
+                        <span className="text-lg font-bold text-white">
+                          {video.profiles?.full_name.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+
+                    {!video.is_following && user?.id !== video.provider_id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFollow(video);
+                        }}
+                        className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white rounded-full p-0.5 shadow-sm hover:scale-110 transition-transform"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
                   <div>
-                    <h3
-                      className="font-semibold text-base sm:text-lg cursor-pointer hover:underline"
-                      onClick={() => onProviderClick?.(video.provider_id)}
-                    >
+                    <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2">
                       {video.profiles?.full_name}
                     </h3>
-                    <p className="text-xs sm:text-sm text-gray-200">
-                      {video.skill_categories?.name}
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-gray-100 font-medium drop-shadow-sm">
+                      <span className="bg-white/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                        {video.skill_categories?.name}
+                      </span>
+                      {video.profiles?.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {video.profiles.location}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <h4 className="font-medium text-sm sm:text-base mb-1 sm:mb-2">{video.title}</h4>
-
-                {video.description && (
-                  <p className="text-xs sm:text-sm text-gray-200 mb-2 sm:mb-3 line-clamp-2">
-                    {video.description}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-                  {video.profiles?.location && (
-                    <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {video.profiles.location}
-                    </div>
-                  )}
-                  {video.average_rating > 0 && (
-                    <div className="flex items-center">
-                      <Star className="w-4 h-4 mr-1 fill-yellow-400 text-yellow-400" />
-                      {video.average_rating.toFixed(1)}
-                    </div>
+                <div className="mb-4">
+                  <h4 className="font-bold text-base mb-1 drop-shadow-md">{video.title}</h4>
+                  {video.description && (
+                    <p className="text-sm text-gray-100 line-clamp-2 drop-shadow-sm max-w-prose">
+                      {video.description}
+                    </p>
                   )}
                 </div>
 
-                <button
-                  onClick={() => onBookClick(video)}
-                  className="mt-2 sm:mt-4 bg-blue-600 text-white px-4 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Book Now
-                </button>
-              </div>
-
-              <div className="flex flex-col items-center gap-4 sm:gap-6 ml-2 sm:ml-4">
-                <button
-                  onClick={() => handleLike(video)}
-                  disabled={liking}
-                  className="flex flex-col items-center disabled:opacity-50"
-                >
-                  <Heart
-                    className={`w-8 h-8 ${video.user_liked ? 'fill-red-500 text-red-500' : 'text-white'
-                      }`}
-                  />
-                  <span className="text-xs mt-1">{video.likes_count}</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectedVideo(video);
-                    setShareModalOpen(true);
-                  }}
-                  className="flex flex-col items-center"
-                >
-                  <Share2 className="w-8 h-8 text-white" />
-                  <span className="text-xs mt-1">Share</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => onBookClick(video)}
+                    className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/30"
+                  >
+                    Book Now
+                  </button>
+                  {(video.average_rating || 0) > 0 && (
+                    <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-bold text-sm">{(video.average_rating || 0).toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -342,6 +470,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           }}
           videoId={selectedVideo.id}
           videoTitle={selectedVideo.title}
+        />
+      )}
+
+      {selectedVideo && (
+        <ReviewsSheet
+          isOpen={reviewsOpen}
+          onClose={() => setReviewsOpen(false)}
+          providerId={selectedVideo.provider_id}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, Camera, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-hot-toast';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -82,7 +83,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       onClose();
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert(error instanceof Error ? error.message : 'Failed to update profile');
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -142,8 +143,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 type="button"
                 onClick={() => setUploadMethod('file')}
                 className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors flex items-center justify-center gap-2 ${uploadMethod === 'file'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 <Upload className="w-4 h-4" />
@@ -153,8 +154,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 type="button"
                 onClick={() => setUploadMethod('url')}
                 className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${uploadMethod === 'url'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 Use URL
