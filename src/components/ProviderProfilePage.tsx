@@ -25,6 +25,7 @@ interface ProviderProfilePageProps {
     onClose: () => void;
     onBookClick?: () => void;
     onMessageClick?: (bookingId: string) => void;
+    onAuthRequired?: () => void;
 }
 
 function formatTimeAgo(dateString: string) {
@@ -51,7 +52,7 @@ function formatViews(views: number) {
     return views.toString();
 }
 
-export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessageClick }: ProviderProfilePageProps) {
+export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessageClick, onAuthRequired }: ProviderProfilePageProps) {
     const [provider, setProvider] = useState<Profile | null>(null);
     const [videos, setVideos] = useState<Video[]>([]);
     const [workSamples, setWorkSamples] = useState<WorkSample[]>([]);
@@ -270,6 +271,10 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                             <FollowButton
                                 providerId={providerId}
                                 initialFollowersCount={provider.followers_count || 0}
+                                onFollowChange={(isFollowing, newCount) => {
+                                    setProvider(prev => prev ? { ...prev, followers_count: newCount } : null);
+                                }}
+                                onAuthRequired={onAuthRequired}
                                 className="!bg-black !text-white hover:!bg-gray-800 !rounded-full !px-6 !py-2 !font-medium !text-sm"
                             />
 

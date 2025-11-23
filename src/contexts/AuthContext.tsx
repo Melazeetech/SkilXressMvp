@@ -26,45 +26,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('AuthContext: Initializing...');
+    let mounted = true;
+
+    // Global safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('AuthContext: Safety timeout triggered, forcing loading false');
+        setLoading(false);
+      }
+    }, 5000); // 5 seconds max for initial load
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      console.log('AuthContext: getSession result', session ? 'Session found' : 'No session');
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        console.log('AuthContext: Loading profile for user', session.user.id);
         loadProfile(session.user.id);
       } else {
+        console.log('AuthContext: No user, setting loading false');
         setLoading(false);
       }
+    }).catch(err => {
+      console.error('AuthContext: getSession error', err);
+      if (mounted) setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      console.log('AuthContext: Auth state change', event);
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          console.log('AuthContext: Loading profile (auth change)');
           await loadProfile(session.user.id);
         } else {
+          console.log('AuthContext: Clearing profile (auth change)');
           setProfile(null);
           setLoading(false);
         }
       })();
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      console.log('AuthContext: Loading profile for', userId);
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile load timeout')), 10000)
+      );
+
+      // Race the supabase query against the timeout
+      const { data, error } = await Promise.race([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle(),
+        timeoutPromise
+      ]) as any;
 
       if (error) throw error;
+      console.log('AuthContext: Profile loaded', data);
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
+      console.log('AuthContext: loadProfile finished, setting loading false');
       setLoading(false);
     }
   };

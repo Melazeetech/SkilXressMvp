@@ -15,6 +15,8 @@ import { NotificationsView } from './components/NotificationsView';
 import { Database } from './lib/database.types';
 import { useBackHandler } from './hooks/useBackHandler';
 import { supabase } from './lib/supabase';
+import { Toaster } from 'react-hot-toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -57,6 +59,24 @@ function AppContent() {
     setCurrentView('feed');
     setActiveBookingId(null);
   }, 'main-view');
+
+  useEffect(() => {
+    // Check for deep links
+    const params = new URLSearchParams(window.location.search);
+    const providerId = params.get('provider');
+    const videoId = params.get('video');
+
+    if (providerId) {
+      setSelectedProviderId(providerId);
+      setProviderProfileOpen(true);
+    }
+
+    if (videoId) {
+      // If we have a video ID, we might want to scroll to it or open it
+      // For now, let's just ensure we're on the feed
+      setCurrentView('feed');
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -131,6 +151,8 @@ function AppContent() {
     setCategoryFilter('');
     setLocationFilter('');
     setSearchModalOpen(false);
+    // Force a re-render of VideoFeed by resetting key or similar if needed, 
+    // but clearing filters should trigger useEffect in VideoFeed.
   };
 
   if (loading) {
@@ -267,6 +289,7 @@ function AppContent() {
                   setSelectedProviderId(providerId);
                   setProviderProfileOpen(true);
                 }}
+                onAuthRequired={() => setAuthModalOpen(true)}
               />
             ) : (
               <LandingPage onGetStarted={() => setAuthModalOpen(true)} />
@@ -301,6 +324,10 @@ function AppContent() {
           onClose={() => {
             setSelectedProviderId(null);
             setProviderProfileOpen(false);
+            // Clear URL param when closing
+            const url = new URL(window.location.href);
+            url.searchParams.delete('provider');
+            window.history.pushState({}, '', url);
           }}
           onBookClick={() => {
             setSelectedProviderId(null);
@@ -315,6 +342,7 @@ function AppContent() {
             setActiveBookingId(bookingId);
             setCurrentView('messages');
           }}
+          onAuthRequired={() => setAuthModalOpen(true)}
         />
       )}
 
@@ -329,11 +357,6 @@ function AppContent() {
     </div>
   );
 }
-
-import { Toaster } from 'react-hot-toast';
-import { ErrorBoundary } from './components/ErrorBoundary';
-
-// ... existing imports ...
 
 function App() {
   return (

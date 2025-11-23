@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Custom hook to handle browser back button for modals and views.
@@ -8,6 +8,13 @@ import { useEffect } from 'react';
  * @param id - Unique identifier for the history state (e.g., 'auth-modal')
  */
 export function useBackHandler(isOpen: boolean, onClose: () => void, id: string) {
+    const onCloseRef = useRef(onClose);
+
+    // Update the ref whenever onClose changes so the effect always has the latest version
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
+
     useEffect(() => {
         if (isOpen) {
             // Push a new entry to history when opened
@@ -15,8 +22,7 @@ export function useBackHandler(isOpen: boolean, onClose: () => void, id: string)
 
             const handlePopState = () => {
                 // If back button is pressed (popstate event), close the modal
-                // We prevent default behavior if needed, but mainly we just want to close
-                onClose();
+                onCloseRef.current();
             };
 
             window.addEventListener('popstate', handlePopState);
@@ -41,5 +47,5 @@ export function useBackHandler(isOpen: boolean, onClose: () => void, id: string)
                 }
             };
         }
-    }, [isOpen, id, onClose]);
+    }, [isOpen, id]); // onClose is intentionally removed from dependencies to prevent re-runs
 }

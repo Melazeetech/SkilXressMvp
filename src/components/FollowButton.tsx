@@ -8,13 +8,15 @@ interface FollowButtonProps {
     initialFollowersCount?: number;
     onFollowChange?: (isFollowing: boolean, newCount: number) => void;
     className?: string;
+    onAuthRequired?: () => void;
 }
 
 export function FollowButton({
     providerId,
     initialFollowersCount = 0,
     onFollowChange,
-    className = ''
+    className = '',
+    onAuthRequired
 }: FollowButtonProps) {
     const { user } = useAuth();
     const [isFollowing, setIsFollowing] = useState(false);
@@ -55,7 +57,11 @@ export function FollowButton({
 
     const handleFollow = async () => {
         if (!user) {
-            alert('Please sign in to follow providers');
+            if (onAuthRequired) {
+                onAuthRequired();
+            } else {
+                alert('Please sign in to follow providers');
+            }
             return;
         }
 
@@ -64,17 +70,21 @@ export function FollowButton({
             return;
         }
 
-        console.log('Attempting to follow:', {
-            follower_id: user.id,
-            following_id: providerId,
-            user_object: user,
-            user_email: user.email
-        });
+        // Optimistic Update
+        const previousIsFollowing = isFollowing;
+        const previousCount = followersCount;
+
+        const newIsFollowing = !isFollowing;
+        const newCount = newIsFollowing ? followersCount + 1 : Math.max(0, followersCount - 1);
+
+        setIsFollowing(newIsFollowing);
+        setFollowersCount(newCount);
+        onFollowChange?.(newIsFollowing, newCount);
 
         setLoading(true);
 
         try {
-            if (isFollowing) {
+            if (previousIsFollowing) {
                 // Unfollow
                 const { error } = await supabase
                     .from('followers')
@@ -84,44 +94,35 @@ export function FollowButton({
 
                 if (error) throw error;
 
-                setIsFollowing(false);
-                const newCount = Math.max(0, followersCount - 1);
-                setFollowersCount(newCount);
-                onFollowChange?.(false, newCount);
+                // Update provider's followers count directly
+                await supabase
+                    .from('profiles')
+                    .update({ followers_count: Math.max(0, followersCount - 1) } as any)
+                    .eq('id', providerId);
+
             } else {
                 // Follow
-                const insertData = {
-                    follower_id: user.id,
-                    following_id: providerId,
-                };
-
-                console.log('Insert data:', insertData);
-
-                const { data, error } = await supabase
+                const { error } = await supabase
                     .from('followers')
-                    .insert([insertData] as any)
-                    .select();
+                    .insert({
+                        follower_id: user.id,
+                        following_id: providerId,
+                    } as any);
 
-                if (error) {
-                    console.error('Follow error details:', {
-                        error,
-                        code: error.code,
-                        message: error.message,
-                        details: error.details,
-                        hint: error.hint
-                    });
-                    throw error;
-                }
+                if (error) throw error;
 
-                console.log('Follow success:', data);
-
-                setIsFollowing(true);
-                const newCount = followersCount + 1;
-                setFollowersCount(newCount);
-                onFollowChange?.(true, newCount);
+                // Update provider's followers count directly
+                await supabase
+                    .from('profiles')
+                    .update({ followers_count: followersCount + 1 } as any)
+                    .eq('id', providerId);
             }
         } catch (error) {
             console.error('Error toggling follow:', error);
+            // Revert optimistic update
+            setIsFollowing(previousIsFollowing);
+            setFollowersCount(previousCount);
+            onFollowChange?.(previousIsFollowing, previousCount);
             alert(`Failed to update follow status: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setLoading(false);
@@ -141,7 +142,15 @@ export function FollowButton({
     }
 
     if (!user || user.id === providerId) {
-        return null;
+        return (
+            <button
+                onClick={handleFollow}
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg ${className}`}
+            >
+                <UserPlus className="w-4 h-4" />
+                <span className="text-sm">Follow</span>
+            </button>
+        );
     }
 
     return (
