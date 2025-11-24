@@ -17,6 +17,7 @@ import { useBackHandler } from './hooks/useBackHandler';
 import { supabase } from './lib/supabase';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingScreen } from './components/LoadingScreen';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -87,13 +88,22 @@ function AppContent() {
   const checkUnreadNotifications = async () => {
     if (!user) return;
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('last_read_notifications_at')
-        .eq('id', user.id)
-        .single();
+      let lastReadAt = new Date(0).toISOString();
 
-      const lastReadAt = (profile as any)?.last_read_notifications_at || new Date(0).toISOString();
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('last_read_notifications_at')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && profile) {
+          lastReadAt = (profile as any).last_read_notifications_at || lastReadAt;
+        }
+      } catch (e) {
+        // Column might not exist yet, ignore
+        console.log('Could not fetch last_read_notifications_at, defaulting to 0');
+      }
 
       let totalUnread = 0;
 
@@ -156,13 +166,7 @@ function AppContent() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-pulse text-2xl font-bold text-blue-600">
-          SkilXpress
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, Volume2, VolumeX, MessageCircle, Plus, Play } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,11 +37,11 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [currentIndex, setCurrentIndex] = useState(0);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [heartAnimations, setHeartAnimations] = useState<{ id: number; x: number; y: number }[]>([]);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [processingLikes, setProcessingLikes] = useState<Set<string>>(new Set());
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,11 +89,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             if (playPromise !== undefined) {
               playPromise.catch((error) => {
                 console.log("Autoplay prevented:", error);
-                if (!video.muted) {
-                  setIsMuted(true);
-                  video.muted = true;
-                  video.play().catch(e => console.error("Muted autoplay failed:", e));
-                }
+                // Try to play anyway, browser might block unmuted autoplay until interaction
+                // We removed the auto-mute fallback to respect user's wish for sound
               });
             }
             setIsPlaying(true);
@@ -130,11 +127,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     } catch (error) {
       console.error('Error incrementing view:', error);
     }
-  };
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMuted(!isMuted);
   };
 
   const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
@@ -468,7 +460,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             className="h-full w-full object-cover"
             loop
             playsInline
-            muted={isMuted}
             onClick={handleVideoClick}
             onPlay={() => index === currentIndex && setIsPlaying(true)}
             onPause={() => index === currentIndex && setIsPlaying(false)}
@@ -538,16 +529,19 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               <span className="text-white text-xs font-medium drop-shadow-md">Share</span>
             </div>
 
-            <button
-              onClick={toggleMute}
-              className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-            >
-              {isMuted ? <VolumeX className="w-8 h-8 text-white" /> : <Volume2 className="w-8 h-8 text-white" />}
-            </button>
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => onBookClick(video)}
+                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+              >
+                <Calendar className="w-8 h-8 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">Book</span>
+            </div>
           </div>
 
           {/* Bottom Info Section */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 pb-20 sm:pb-8 text-white z-10">
+          <div className="absolute bottom-0 left-0 right-0 p-4 pb-0 text-white z-10">
             <div className="flex items-end justify-between max-w-[85%]">
               <div className="flex-1">
                 <div className="flex items-center mb-3 cursor-pointer" onClick={() => onProviderClick?.(video.provider_id)}>
@@ -580,9 +574,17 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                   </div>
 
                   <div>
-                    <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2">
-                      {video.profiles?.full_name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2">
+                        {video.profiles?.full_name}
+                      </h3>
+                      {(video.average_rating || 0) > 0 && (
+                        <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full">
+                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          <span className="font-bold text-xs">{(video.average_rating || 0).toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-gray-100 font-medium drop-shadow-sm">
                       <span className="bg-white/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
                         {video.skill_categories?.name}
@@ -600,26 +602,37 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 <div className="mb-4">
                   <h4 className="font-bold text-base mb-1 drop-shadow-md">{video.title}</h4>
                   {video.description && (
-                    <p className="text-sm text-gray-100 line-clamp-2 drop-shadow-sm max-w-prose">
-                      {video.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => onBookClick(video)}
-                    className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all shadow-lg hover:shadow-blue-500/30"
-                  >
-                    Book Now
-                  </button>
-                  {(video.average_rating || 0) > 0 && (
-                    <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full">
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                      <span className="font-bold text-sm">{(video.average_rating || 0).toFixed(1)}</span>
+                    <div>
+                      <p
+                        className={`text-sm text-gray-100 drop-shadow-sm max-w-prose transition-all duration-200 ${expandedDescriptions.has(video.id) ? '' : 'line-clamp-2'
+                          }`}
+                      >
+                        {video.description}
+                      </p>
+                      {video.description.length > 60 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedDescriptions(prev => {
+                              const next = new Set(prev);
+                              if (next.has(video.id)) {
+                                next.delete(video.id);
+                              } else {
+                                next.add(video.id);
+                              }
+                              return next;
+                            });
+                          }}
+                          className="text-xs font-semibold text-white mt-1 hover:underline drop-shadow-md"
+                        >
+                          {expandedDescriptions.has(video.id) ? 'Show less' : 'more'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
+
+
               </div>
             </div>
           </div>
