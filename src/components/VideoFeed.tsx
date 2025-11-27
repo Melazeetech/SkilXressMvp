@@ -29,9 +29,10 @@ interface VideoFeedProps {
   onBookClick: (video: Video) => void;
   onProviderClick?: (providerId: string) => void;
   onAuthRequired?: () => void;
+  sharedVideoId?: string | null;
 }
 
-export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick, onProviderClick, onAuthRequired }: VideoFeedProps) {
+export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick, onProviderClick, onAuthRequired, sharedVideoId }: VideoFeedProps) {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -45,6 +46,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   const { user } = useAuth();
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
@@ -52,6 +54,21 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   useEffect(() => {
     loadVideos();
   }, [categoryFilter, searchQuery, locationFilter]);
+
+  // Handle initial scroll to shared video
+  useEffect(() => {
+    if (videos.length > 0 && sharedVideoId && !initialScrollDone.current) {
+      const index = videos.findIndex(v => v.id === sharedVideoId);
+      if (index !== -1) {
+        // Use a small timeout to ensure DOM is ready
+        setTimeout(() => {
+          scrollToIndex(index);
+          setCurrentIndex(index);
+          initialScrollDone.current = true;
+        }, 100);
+      }
+    }
+  }, [videos, sharedVideoId]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -138,8 +155,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     }
   };
 
+  const [error, setError] = useState<string | null>(null);
+
+  // ... (keep existing useEffects)
+
   const loadVideos = async () => {
     try {
+      setError(null);
       console.log('VideoFeed: Loading videos...');
       let query = supabase
         .from('skill_videos')
@@ -172,7 +194,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       );
 
       // Race the supabase query against the timeout
-      const { data, error } = await Promise.race([
+      let { data, error } = await Promise.race([
         query,
         timeoutPromise
       ]) as any;
@@ -180,6 +202,35 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       if (error) {
         console.error('VideoFeed: Error fetching videos', error);
         throw error;
+      }
+
+      // If we have a shared video ID, ensure it's loaded
+      if (sharedVideoId) {
+        const sharedVideoExists = data?.some((v: any) => v.id === sharedVideoId);
+        if (!sharedVideoExists) {
+          console.log('VideoFeed: Shared video not in list, fetching specifically:', sharedVideoId);
+          const { data: specificVideo, error: specificError } = await supabase
+            .from('skill_videos')
+            .select(`
+              *,
+              profiles!skill_videos_provider_id_fkey (
+                full_name,
+                avatar_url,
+                location
+              ),
+              skill_categories (
+                name
+              )
+            `)
+            .eq('id', sharedVideoId)
+            .maybeSingle();
+
+          if (specificError) {
+            console.error('VideoFeed: Error fetching shared video', specificError);
+          } else if (specificVideo) {
+            data = [specificVideo, ...(data || [])];
+          }
+        }
       }
 
       console.log('VideoFeed: Fetched videos count:', data?.length);
@@ -226,16 +277,20 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         })
       );
 
+      // Filter out videos with missing profiles (e.g. due to RLS or deleted users)
+      const validVideos = videosWithLikes.filter((v: any) => v.profiles);
+
       const filteredVideos = locationFilter
-        ? videosWithLikes.filter((v: Video) =>
+        ? validVideos.filter((v: Video) =>
           v.profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
         )
-        : videosWithLikes;
+        : validVideos;
 
       console.log('VideoFeed: Final filtered videos count:', filteredVideos.length);
       setVideos(filteredVideos);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading videos:', error);
+      setError(error.message || 'Failed to load videos');
     } finally {
       console.log('VideoFeed: Finished loading');
       setLoading(false);
@@ -434,10 +489,22 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
   if (videos.length === 0) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-xl text-gray-600">No videos found</p>
-          <p className="text-sm text-gray-400 mt-2">Try adjusting your filters</p>
+      <div className="flex items-center justify-center h-screen bg-black text-white">
+        <div className="text-center p-6">
+          <p className="text-xl font-medium mb-2">{error ? 'Error loading videos' : 'No videos found'}</p>
+          <p className="text-sm text-gray-400 mb-4">{error || 'Try adjusting your filters'}</p>
+          {!user && (
+            <div className="max-w-xs mx-auto text-xs text-gray-500 border-t border-gray-800 pt-4 mt-4">
+              <p className="mb-2">Viewing as guest</p>
+              <p>If you are the developer: Ensure 'skill_videos' and 'profiles' tables have public read access policies in Supabase.</p>
+            </div>
+          )}
+          <button
+            onClick={() => window.location.href = '/'}
+            className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium transition-colors"
+          >
+            Go Home
+          </button>
         </div>
       </div>
     );

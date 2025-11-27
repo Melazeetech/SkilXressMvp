@@ -19,6 +19,8 @@ export interface Database {
           bio: string | null
           phone: string | null
           location: string | null
+          experience: string | null
+          specialty: string | null
           followers_count: number
           following_count: number
           last_read_notifications_at?: string
@@ -34,6 +36,8 @@ export interface Database {
           bio?: string | null
           phone?: string | null
           location?: string | null
+          experience?: string | null
+          specialty?: string | null
           followers_count?: number
           following_count?: number
           created_at?: string
@@ -48,6 +52,8 @@ export interface Database {
           bio?: string | null
           phone?: string | null
           location?: string | null
+          experience?: string | null
+          specialty?: string | null
           followers_count?: number
           following_count?: number
           created_at?: string
@@ -209,6 +215,10 @@ export interface Database {
           sender_id: string
           message: string
           is_read: boolean
+          message_type: 'text' | 'image' | 'audio' | 'file'
+          file_url: string | null
+          file_name: string | null
+          file_size: number | null
           created_at: string
         }
         Insert: {
@@ -217,6 +227,10 @@ export interface Database {
           sender_id: string
           message: string
           is_read?: boolean
+          message_type?: 'text' | 'image' | 'audio' | 'file'
+          file_url?: string | null
+          file_name?: string | null
+          file_size?: number | null
           created_at?: string
         }
         Update: {
@@ -225,6 +239,10 @@ export interface Database {
           sender_id?: string
           message?: string
           is_read?: boolean
+          message_type?: 'text' | 'image' | 'audio' | 'file'
+          file_url?: string | null
+          file_name?: string | null
+          file_size?: number | null
           created_at?: string
         }
       }

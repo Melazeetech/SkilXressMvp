@@ -38,6 +38,7 @@ function AppContent() {
   const [providerProfileOpen, setProviderProfileOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [sharedVideoId, setSharedVideoId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'feed' | 'dashboard' | 'messages' | 'notifications'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -74,7 +75,7 @@ function AppContent() {
 
     if (videoId) {
       // If we have a video ID, we might want to scroll to it or open it
-      // For now, let's just ensure we're on the feed
+      setSharedVideoId(videoId);
       setCurrentView('feed');
     }
   }, []);
@@ -88,59 +89,19 @@ function AppContent() {
   const checkUnreadNotifications = async () => {
     if (!user) return;
     try {
-      let lastReadAt = new Date(0).toISOString();
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
 
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('last_read_notifications_at')
-          .eq('id', user.id)
-          .single();
-
-        if (!error && profile) {
-          lastReadAt = (profile as any).last_read_notifications_at || lastReadAt;
-        }
-      } catch (e) {
-        // Column might not exist yet, ignore
-        console.log('Could not fetch last_read_notifications_at, defaulting to 0');
+      if (error) {
+        // If table doesn't exist yet, fail silently
+        console.log('Notifications table check failed - likely not created yet');
+        return;
       }
 
-      let totalUnread = 0;
-
-      // 1. Likes
-      const { data: myVideos } = await supabase
-        .from('skill_videos')
-        .select('id')
-        .eq('provider_id', user.id);
-
-      if (myVideos && myVideos.length > 0) {
-        const videoIds = (myVideos as any[]).map(v => v.id);
-        const { count } = await supabase
-          .from('video_likes')
-          .select('id', { count: 'exact', head: true })
-          .in('video_id', videoIds)
-          .gt('created_at', lastReadAt);
-        totalUnread += (count || 0);
-      }
-
-      // 2. Followers
-      const { count: followersCount } = await supabase
-        .from('followers')
-        .select('id', { count: 'exact', head: true })
-        .eq('following_id', user.id)
-        .gt('created_at', lastReadAt);
-      totalUnread += (followersCount || 0);
-
-      // 3. Bookings
-      const { count: bookingsCount } = await supabase
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .or(`client_id.eq.${user.id},provider_id.eq.${user.id}`)
-        .gt('created_at', lastReadAt);
-      totalUnread += (bookingsCount || 0);
-
-      setUnreadCount(totalUnread);
-
+      setUnreadCount(count || 0);
     } catch (error) {
       console.error("Error checking unread notifications:", error);
     }
@@ -161,6 +122,7 @@ function AppContent() {
     setCategoryFilter('');
     setLocationFilter('');
     setSearchModalOpen(false);
+    setSharedVideoId(null);
     // Force a re-render of VideoFeed by resetting key or similar if needed, 
     // but clearing filters should trigger useEffect in VideoFeed.
   };
@@ -171,7 +133,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && user ? 'bg-transparent' : 'bg-blue-600 shadow-md'
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && (user || sharedVideoId) ? 'bg-transparent' : 'bg-blue-600 shadow-md'
         }`}>
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
@@ -279,11 +241,11 @@ function AppContent() {
         </div>
       </header>
 
-      <main className={`${currentView === 'feed' && user ? 'pt-0' : 'pt-14'}`}>
+      <main className={`${currentView === 'feed' && (user || sharedVideoId) ? 'pt-0' : 'pt-14'}`}>
         {currentView === 'feed' ? (
           <>
 
-            {user ? (
+            {user || sharedVideoId ? (
               <VideoFeed
                 searchQuery={searchQuery}
                 categoryFilter={categoryFilter}
@@ -294,6 +256,7 @@ function AppContent() {
                   setProviderProfileOpen(true);
                 }}
                 onAuthRequired={() => setAuthModalOpen(true)}
+                sharedVideoId={sharedVideoId}
               />
             ) : (
               <LandingPage onGetStarted={() => setAuthModalOpen(true)} />

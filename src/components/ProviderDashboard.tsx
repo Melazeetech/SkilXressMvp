@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
 import { PortfolioManager } from './PortfolioManager';
+import { ProviderStatsHeader } from './ProviderStatsHeader';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   client_profile: {
@@ -45,11 +46,51 @@ export function ProviderDashboard() {
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showChat, setShowChat] = useState(false);
-  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    totalVideos: 0,
+    totalViews: 0,
+    averageRating: 0,
+    totalReviews: 0,
+  });
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     loadData();
+    loadStats();
   }, [activeTab]);
+
+  const loadStats = async () => {
+    if (!user) return;
+
+    try {
+      const { data: videoData } = await supabase
+        .from('skill_videos')
+        .select('views_count')
+        .eq('provider_id', user.id);
+
+      const totalVideos = videoData?.length || 0;
+      const totalViews = videoData?.reduce((sum: number, v: any) => sum + (v.views_count || 0), 0) || 0;
+
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select('rating')
+        .eq('provider_id', user.id);
+
+      const totalReviews = ratingsData?.length || 0;
+      const averageRating = totalReviews > 0 && ratingsData
+        ? ratingsData.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews
+        : 0;
+
+      setStats({
+        totalVideos,
+        totalViews,
+        averageRating,
+        totalReviews,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
@@ -122,6 +163,7 @@ export function ProviderDashboard() {
 
       if (error) throw error;
       loadData();
+      loadStats(); // Refresh stats when booking status changes
     } catch (error) {
       console.error('Error updating booking:', error);
     }
@@ -194,6 +236,9 @@ export function ProviderDashboard() {
             Portfolio
           </button>
         </div>
+
+        {/* Provider Stats Header */}
+        <ProviderStatsHeader profile={profile} stats={stats} />
 
         {loading ? (
           <div className="flex items-center justify-center h-64">

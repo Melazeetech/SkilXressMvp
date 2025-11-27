@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Bell, Heart, UserPlus, Calendar, Loader2 } from 'lucide-react';
+import { Bell, Heart, UserPlus, Calendar, Loader2, Trash2, Check, CheckCheck, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-hot-toast';
 
 type NotificationItem = {
     id: string;
-    type: 'like' | 'follow' | 'booking';
+    type: 'like' | 'follow' | 'booking' | 'message';
     title: string;
     message: string;
     created_at: string;
@@ -22,142 +23,138 @@ export function NotificationsView() {
     useEffect(() => {
         if (user) {
             loadNotifications();
+            setupRealtimeSubscription();
         }
+
+        return () => {
+            supabase.removeAllChannels();
+        };
     }, [user]);
+
+    const setupRealtimeSubscription = () => {
+        if (!user) return;
+
+        supabase
+            .channel('notifications-table')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    const newNotification = payload.new as NotificationItem;
+                    setNotifications(prev => [newNotification, ...prev]);
+                    toast.success(newNotification.message, {
+                        icon: getIconForType(newNotification.type),
+                        duration: 4000
+                    });
+                }
+            )
+            .subscribe();
+    };
 
     const loadNotifications = async () => {
         if (!user) return;
         setLoading(true);
-        const allNotifications: NotificationItem[] = [];
 
         try {
-            // Fetch user profile for last_read_at
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('last_read_notifications_at')
-                .eq('id', user.id)
-                .single();
-
-            const lastReadAt = (profile as any)?.last_read_notifications_at ? new Date((profile as any).last_read_notifications_at) : new Date(0);
-
-            // 1. Fetch Likes (on my videos)
-            const { data: myVideos } = await supabase
-                .from('skill_videos')
-                .select('id, title')
-                .eq('provider_id', user.id);
-
-            if (myVideos && myVideos.length > 0) {
-                const videoIds = (myVideos as any[]).map(v => v.id);
-                const { data: likes } = await supabase
-                    .from('video_likes')
-                    .select(`
-            id,
-            created_at,
-            user:profiles!video_likes_user_id_fkey(full_name),
-            video:skill_videos!video_likes_video_id_fkey(title)
-          `)
-                    .in('video_id', videoIds)
-                    .order('created_at', { ascending: false })
-                    .limit(20);
-
-                if (likes) {
-                    (likes as any[]).forEach((like) => {
-                        allNotifications.push({
-                            id: like.id,
-                            type: 'like',
-                            title: 'New Like',
-                            message: `${like.user?.full_name || 'Someone'} liked your video "${like.video?.title}"`,
-                            created_at: like.created_at,
-                            read: new Date(like.created_at) <= lastReadAt,
-                            data: like
-                        });
-                    });
-                }
-            }
-
-            // 2. Fetch New Followers
-            const { data: followers } = await supabase
-                .from('followers')
-                .select(`
-          id,
-          created_at,
-          follower:profiles!followers_follower_id_fkey(full_name)
-        `)
-                .eq('following_id', user.id)
+            const { data, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
-                .limit(20);
+                .limit(50);
 
-            if (followers) {
-                (followers as any[]).forEach((follow) => {
-                    allNotifications.push({
-                        id: follow.id,
-                        type: 'follow',
-                        title: 'New Follower',
-                        message: `${follow.follower?.full_name || 'Someone'} started following you`,
-                        created_at: follow.created_at,
-                        read: new Date(follow.created_at) <= lastReadAt,
-                        data: follow
-                    });
-                });
+            if (error) throw error;
+
+            if (data) {
+                setNotifications(data as NotificationItem[]);
             }
-
-            // 3. Fetch Bookings (as client or provider)
-            const { data: bookings } = await supabase
-                .from('bookings')
-                .select(`
-          id,
-          status,
-          created_at,
-          preferred_date,
-          client:profiles!bookings_client_id_fkey(full_name),
-          provider:profiles!bookings_provider_id_fkey(full_name)
-        `)
-                .or(`client_id.eq.${user.id},provider_id.eq.${user.id}`)
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (bookings) {
-                (bookings as any[]).forEach((booking) => {
-                    const otherName = booking.client_id === user.id ? booking.provider?.full_name : booking.client?.full_name;
-
-                    allNotifications.push({
-                        id: booking.id,
-                        type: 'booking',
-                        title: 'Booking Update',
-                        message: `Booking with ${otherName} is ${booking.status}`,
-                        created_at: booking.created_at,
-                        read: new Date(booking.created_at) <= lastReadAt,
-                        data: booking
-                    });
-                });
-            }
-
-            // Sort all by date
-            allNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            setNotifications(allNotifications);
-
         } catch (error) {
             console.error('Error loading notifications:', error);
+            // Fallback for when table doesn't exist yet
+            toast.error('Please run the database setup script first!');
         } finally {
             setLoading(false);
         }
     };
 
-    const markAllAsRead = async () => {
-        if (!user) return;
-        setMarkingRead(true);
+    const markAsRead = async (id: string) => {
         try {
-            const now = new Date().toISOString();
-            await supabase
-                .from('profiles')
-                .update({ last_read_notifications_at: now } as any)
-                .eq('id', user.id);
+            // Optimistic update
+            setNotifications(prev => prev.map(n =>
+                n.id === id ? { ...n, read: true } : n
+            ));
 
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            const { error } = await supabase
+                .from('notifications')
+                .update({ read: true } as any)
+                .eq('id', id);
+
+            if (error) throw error;
         } catch (error) {
-            console.error('Error marking notifications as read:', error);
+            console.error('Error marking as read:', error);
+            toast.error('Failed to update status');
+        }
+    };
+
+    const markAllAsRead = async () => {
+        if (!user || notifications.length === 0) return;
+        setMarkingRead(true);
+
+        try {
+            // Optimistic update
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+            const { error } = await supabase
+                .from('notifications')
+                .update({ read: true } as any)
+                .eq('user_id', user.id)
+                .eq('read', false);
+
+            if (error) throw error;
+            toast.success('All marked as read');
+        } catch (error) {
+            console.error('Error marking all as read:', error);
+            toast.error('Failed to mark all as read');
+            // Revert optimistic update
+            loadNotifications();
         } finally {
             setMarkingRead(false);
+        }
+    };
+
+    const deleteNotification = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            // Optimistic update
+            setNotifications(prev => prev.filter(n => n.id !== id));
+
+            const { error } = await supabase
+                .from('notifications')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            toast.success('Notification deleted');
+        } catch (error) {
+            console.error('Error deleting notification:', error);
+            toast.error('Failed to delete');
+            // Revert
+            loadNotifications();
+        }
+    };
+
+    const getIconForType = (type: string) => {
+        switch (type) {
+            case 'like': return '❤️';
+            case 'follow': return '👤';
+            case 'booking': return '📅';
+            case 'message': return '💬';
+            default: return '🔔';
         }
     };
 
@@ -173,48 +170,93 @@ export function NotificationsView() {
 
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-[calc(100vh-3.5rem)]">
-            <div className="p-4 border-b border-gray-100 sticky top-14 bg-white z-10 flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-                {unreadCount > 0 && (
+            <div className="p-4 border-b border-gray-100 sticky top-14 bg-white z-10 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+                    {unreadCount > 0 && (
+                        <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">
+                            {unreadCount} new
+                        </span>
+                    )}
+                </div>
+                {notifications.length > 0 && (
                     <button
                         onClick={markAllAsRead}
-                        disabled={markingRead}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                        disabled={markingRead || unreadCount === 0}
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        {markingRead ? 'Marking...' : 'Mark all as read'}
+                        <CheckCheck className="w-4 h-4" />
+                        Mark all read
                     </button>
                 )}
             </div>
 
             <div className="divide-y divide-gray-100">
                 {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                        <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                        <p>No notifications yet</p>
+                    <div className="p-12 text-center text-gray-500 flex flex-col items-center">
+                        <div className="bg-gray-50 p-4 rounded-full mb-4">
+                            <Bell className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">No notifications</h3>
+                        <p className="text-sm">We'll notify you when something happens.</p>
                     </div>
                 ) : (
                     notifications.map((notification) => (
-                        <div key={notification.id} className={`p-4 hover:bg-gray-50 transition-colors flex gap-4 ${!notification.read ? 'bg-blue-50/30' : ''}`}>
-                            <div className={`mt-1 p-2 rounded-full flex-shrink-0 ${notification.type === 'like' ? 'bg-red-100 text-red-600' :
-                                notification.type === 'follow' ? 'bg-blue-100 text-blue-600' :
-                                    'bg-green-100 text-green-600'
+                        <div
+                            key={notification.id}
+                            onClick={() => !notification.read && markAsRead(notification.id)}
+                            className={`group p-4 hover:bg-gray-50 transition-all duration-200 flex gap-4 cursor-pointer relative ${!notification.read ? 'bg-blue-50/40 border-l-4 border-blue-500' : 'border-l-4 border-transparent'
+                                }`}
+                        >
+                            <div className={`mt-1 p-2 rounded-full flex-shrink-0 shadow-sm ${notification.type === 'like' ? 'bg-red-100 text-red-600' :
+                                    notification.type === 'follow' ? 'bg-blue-100 text-blue-600' :
+                                        notification.type === 'booking' ? 'bg-green-100 text-green-600' :
+                                            'bg-purple-100 text-purple-600'
                                 }`}>
                                 {notification.type === 'like' && <Heart className="w-5 h-5 fill-current" />}
                                 {notification.type === 'follow' && <UserPlus className="w-5 h-5" />}
                                 {notification.type === 'booking' && <Calendar className="w-5 h-5" />}
+                                {notification.type === 'message' && <MessageSquare className="w-5 h-5" />}
                             </div>
 
-                            <div className="flex-1">
-                                <h3 className={`font-semibold text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>{notification.title}</h3>
-                                <p className="text-gray-600 text-sm mt-0.5">{notification.message}</p>
-                                <span className="text-xs text-gray-400 mt-2 block">
-                                    {new Date(notification.created_at).toLocaleDateString()} • {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
+                            <div className="flex-1 pr-8">
+                                <div className="flex justify-between items-start">
+                                    <h3 className={`font-semibold text-sm ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
+                                        {notification.title}
+                                    </h3>
+                                    <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                                        {new Date(notification.created_at).toLocaleDateString() === new Date().toLocaleDateString()
+                                            ? new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                            : new Date(notification.created_at).toLocaleDateString()}
+                                    </span>
+                                </div>
+                                <p className={`text-sm mt-0.5 ${!notification.read ? 'text-gray-800 font-medium' : 'text-gray-600'}`}>
+                                    {notification.message}
+                                </p>
                             </div>
 
-                            {!notification.read && (
-                                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0" />
-                            )}
+                            {/* Hover Actions */}
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow-sm">
+                                {!notification.read && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            markAsRead(notification.id);
+                                        }}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md"
+                                        title="Mark as read"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={(e) => deleteNotification(notification.id, e)}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-md"
+                                    title="Delete notification"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     ))
                 )}

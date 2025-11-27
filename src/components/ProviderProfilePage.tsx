@@ -267,6 +267,23 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                             </p>
                         )}
 
+                        {(provider.experience || provider.specialty) && (
+                            <div className="flex flex-wrap gap-4 mb-6 text-sm">
+                                {provider.specialty && (
+                                    <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg">
+                                        <Star className="w-4 h-4" />
+                                        <span className="font-medium">{provider.specialty}</span>
+                                    </div>
+                                )}
+                                {provider.experience && (
+                                    <div className="flex items-center gap-2 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg">
+                                        <Briefcase className="w-4 h-4" />
+                                        <span>{provider.experience}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
                             <FollowButton
                                 providerId={providerId}

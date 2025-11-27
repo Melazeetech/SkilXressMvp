@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
+import { ClientStatsHeader } from './ClientStatsHeader';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   provider_profile: {
@@ -27,11 +28,49 @@ export function ClientDashboard() {
   const [ratingBooking, setRatingBooking] = useState<string | null>(null);
   const [rating, setRating] = useState(5);
   const [review, setReview] = useState('');
-  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    totalBookings: 0,
+    completedBookings: 0,
+    pendingBookings: 0,
+    totalReviews: 0,
+  });
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     loadBookings();
+    loadStats();
   }, []);
+
+  const loadStats = async () => {
+    if (!user) return;
+
+    try {
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('status')
+        .eq('client_id', user.id);
+
+      const totalBookings = bookingsData?.length || 0;
+      const completedBookings = bookingsData?.filter((b: any) => b.status === 'completed').length || 0;
+      const pendingBookings = bookingsData?.filter((b: any) => b.status === 'pending').length || 0;
+
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select('id')
+        .eq('client_id', user.id);
+
+      const totalReviews = ratingsData?.length || 0;
+
+      setStats({
+        totalBookings,
+        completedBookings,
+        pendingBookings,
+        totalReviews,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const loadBookings = async () => {
     if (!user) return;
@@ -55,6 +94,7 @@ export function ClientDashboard() {
         .order('created_at', { ascending: false });
 
       setBookings(data || []);
+      loadStats(); // Refresh stats when bookings are loaded
     } catch (error) {
       console.error('Error loading bookings:', error);
     } finally {
@@ -77,12 +117,13 @@ export function ClientDashboard() {
         client_id: user.id,
         rating,
         review: review.trim() || null,
-      });
+      } as any);
 
       if (error) throw error;
       setRatingBooking(null);
       setRating(5);
       setReview('');
+      loadStats(); // Refresh stats to show updated review count
       alert('Thank you for your feedback!');
     } catch (error) {
       console.error('Error submitting rating:', error);
@@ -105,6 +146,9 @@ export function ClientDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Client Stats Header */}
+        <ClientStatsHeader profile={profile} stats={stats} />
+
         <h1 className="text-2xl font-bold mb-6">My Bookings</h1>
 
         <div className="space-y-4">
@@ -142,15 +186,14 @@ export function ClientDashboard() {
                     </div>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      booking.status === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : booking.status === 'confirmed'
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${booking.status === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : booking.status === 'confirmed'
                         ? 'bg-blue-100 text-blue-800'
                         : booking.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
                   >
                     {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                   </span>
@@ -201,11 +244,10 @@ export function ClientDashboard() {
                           className="focus:outline-none"
                         >
                           <Star
-                            className={`w-8 h-8 ${
-                              star <= rating
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
+                            className={`w-8 h-8 ${star <= rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                              }`}
                           />
                         </button>
                       ))}

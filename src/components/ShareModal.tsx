@@ -80,18 +80,18 @@ export function ShareModal({ isOpen, onClose, videoId, videoTitle }: ShareModalP
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Share Link
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
                             value={shareUrl}
                             readOnly
-                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg bg-gray-50 text-sm"
                         />
                         <button
                             onClick={handleCopyLink}
-                            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${copied
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                            className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${copied
+                                ? 'bg-green-500 text-white'
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
                                 }`}
                         >
                             {copied ? (
