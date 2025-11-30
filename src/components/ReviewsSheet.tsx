@@ -1,4 +1,4 @@
-import { Star, X, User, Loader2 } from 'lucide-react';
+import { Star, X, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
@@ -40,15 +40,28 @@ export function ReviewsSheet({ isOpen, onClose, providerId }: ReviewsSheetProps)
         if (!user) return;
 
         // Check if user has a completed booking with this provider
-        const { data } = await supabase
+        const { data: completedBookings } = await supabase
             .from('bookings')
             .select('id')
             .eq('client_id', user.id)
             .eq('provider_id', providerId)
-            .eq('status', 'completed')
+            .eq('status', 'completed');
+
+        if (!completedBookings || completedBookings.length === 0) {
+            setCanReview(false);
+            return;
+        }
+
+        // Check if user has already reviewed this provider
+        const { data: existingReview } = await supabase
+            .from('ratings')
+            .select('id')
+            .eq('client_id', user.id)
+            .eq('provider_id', providerId)
             .limit(1);
 
-        setCanReview(!!data && data.length > 0);
+        // User can review if they have completed booking AND haven't already reviewed
+        setCanReview(!existingReview || existingReview.length === 0);
     };
 
     const loadReviews = async () => {
@@ -82,16 +95,22 @@ export function ReviewsSheet({ isOpen, onClose, providerId }: ReviewsSheetProps)
         setSubmitting(true);
         try {
             // Get a booking ID to link the review to
-            const { data: bookingData } = await supabase
+            const { data: bookingData, error: bookingError } = await supabase
                 .from('bookings')
                 .select('id')
                 .eq('client_id', user.id)
                 .eq('provider_id', providerId)
                 .eq('status', 'completed')
                 .limit(1)
-                .single();
+                .maybeSingle();
 
-            if (!bookingData) throw new Error('No completed booking found');
+            if (bookingError) {
+                throw new Error(`Booking error: ${bookingError.message}`);
+            }
+
+            if (!bookingData) {
+                throw new Error('You must complete a booking before leaving a review');
+            }
 
             const { error } = await supabase
                 .from('ratings')
@@ -101,7 +120,7 @@ export function ReviewsSheet({ isOpen, onClose, providerId }: ReviewsSheetProps)
                     booking_id: bookingData.id,
                     rating: userRating,
                     review: reviewText.trim(),
-                });
+                } as any);
 
             if (error) throw error;
 
@@ -110,8 +129,17 @@ export function ReviewsSheet({ isOpen, onClose, providerId }: ReviewsSheetProps)
             setReviewText('');
             setUserRating(5);
             loadReviews();
-        } catch (error) {
+            // Re-check eligibility (user can no longer review)
+            checkReviewEligibility();
+        } catch (error: any) {
             console.error('Error submitting review:', error);
+            console.error('Error details:', {
+                message: error?.message,
+                code: error?.code,
+                details: error?.details,
+                hint: error?.hint
+            });
+            alert(`Failed to submit review: ${error?.message || 'Unknown error'}. Please try again.`);
         } finally {
             setSubmitting(false);
         }
@@ -131,13 +159,25 @@ export function ReviewsSheet({ isOpen, onClose, providerId }: ReviewsSheetProps)
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4">
-                    {canReview && !isWriting && (
+                    {!user && (
+                        <div className="mb-6 p-4 bg-gray-50 rounded-xl text-center text-sm text-gray-600">
+                            Please log in to write a review
+                        </div>
+                    )}
+
+                    {user && canReview && !isWriting && (
                         <button
                             onClick={() => setIsWriting(true)}
                             className="w-full mb-6 py-3 bg-blue-50 text-blue-600 rounded-xl font-medium hover:bg-blue-100 transition-colors"
                         >
                             Write a Review
                         </button>
+                    )}
+
+                    {user && !canReview && !isWriting && (
+                        <div className="mb-6 p-4 bg-amber-50 rounded-xl text-center text-sm text-amber-700">
+                            Complete a booking with this provider to leave a review
+                        </div>
                     )}
 
                     {isWriting && (

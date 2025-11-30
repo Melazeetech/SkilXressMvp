@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { ShareModal } from './ShareModal';
 import { HeartOverlay } from './HeartOverlay';
 import { ReviewsSheet } from './ReviewsSheet';
 import { useBackHandler } from '../hooks/useBackHandler';
+import { VideoViewsModal } from './VideoViewsModal';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   profiles: {
@@ -43,10 +44,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [processingLikes, setProcessingLikes] = useState<Set<string>>(new Set());
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+  const [viewsModalOpen, setViewsModalOpen] = useState(false);
+  const [videoForViews, setVideoForViews] = useState<Video | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScrollIndexRef = useRef<number>(0);
   const { user } = useAuth();
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
@@ -85,7 +90,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      // Cleanup scroll timeout on unmount
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [currentIndex, videos.length]);
 
   const scrollToIndex = (index: number) => {
@@ -128,21 +139,29 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   }, [currentIndex, videos]);
 
   const incrementView = async (videoId: string) => {
+    if (!user) return;
+
     try {
-      const { error } = await supabase.rpc('increment_view_count', { video_id: videoId });
-      if (error) {
-        // Fallback if RPC fails or doesn't exist
-        console.warn('RPC increment_view_count failed, falling back to direct update', error);
-        const video = videos.find(v => v.id === videoId);
-        if (video) {
-          await supabase
-            .from('skill_videos')
-            .update({ views_count: (video.views_count || 0) + 1 } as any)
-            .eq('id', videoId);
-        }
+      const { error } = await supabase
+        .from('video_views')
+        .insert({
+          video_id: videoId,
+          user_id: user.id
+        } as any);
+
+      if (!error) {
+        // Successfully recorded a new unique view
+        // Update local state to reflect the change immediately
+        setVideos(prev => prev.map(v =>
+          v.id === videoId
+            ? { ...v, views_count: (v.views_count || 0) + 1 }
+            : v
+        ));
+      } else if (error.code !== '23505') { // Ignore unique constraint violation
+        console.error('Error recording view:', error);
       }
     } catch (error) {
-      console.error('Error incrementing view:', error);
+      console.error('Error recording view:', error);
     }
   };
 
@@ -156,8 +175,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   };
 
   const [error, setError] = useState<string | null>(null);
-
-  // ... (keep existing useEffects)
 
   const loadVideos = async () => {
     try {
@@ -296,8 +313,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       setLoading(false);
     }
   };
-
-
 
   const handleLike = async (video: Video) => {
     if (!user) {
@@ -468,15 +483,30 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     }
   };
 
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const container = e.currentTarget;
     const scrollTop = container.scrollTop;
     const itemHeight = container.clientHeight;
     const newIndex = Math.round(scrollTop / itemHeight);
 
-    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
-      setCurrentIndex(newIndex);
+    // Clear any pending scroll timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+
+    // Debounce the index update to prevent rapid changes
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
+        // Snap to the exact position after user stops scrolling
+        container.scrollTo({
+          top: newIndex * itemHeight,
+          behavior: 'smooth'
+        });
+        setCurrentIndex(newIndex);
+        lastScrollIndexRef.current = newIndex;
+      }
+    }, 150); // 150ms debounce - adjust if needed
   };
 
   if (loading) {
@@ -558,6 +588,19 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
           {/* Right Side Actions */}
           <div className="absolute bottom-20 right-4 flex flex-col items-center gap-6 z-20">
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setVideoForViews(video);
+                  setViewsModalOpen(true);
+                }}
+                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
+              >
+                <Eye className="w-8 h-8 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">{video.views_count || 0}</span>
+            </div>
+
             <div className="flex flex-col items-center gap-1">
               <button
                 onClick={() => handleLike(video)}
@@ -723,6 +766,22 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           isOpen={reviewsOpen}
           onClose={() => setReviewsOpen(false)}
           providerId={selectedVideo.provider_id}
+        />
+      )}
+
+      {videoForViews && (
+        <VideoViewsModal
+          isOpen={viewsModalOpen}
+          onClose={() => {
+            setViewsModalOpen(false);
+            setVideoForViews(null);
+          }}
+          videoId={videoForViews.id}
+          onProfileClick={(userId) => {
+            setViewsModalOpen(false);
+            setVideoForViews(null);
+            onProviderClick?.(userId);
+          }}
         />
       )}
     </div>

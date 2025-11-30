@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { Sparkles, Video, Calendar, Star, ArrowRight, Wrench, Home as HomeIcon, Scissors, Car, Zap, Users, CheckCircle, Shield, Clock, DollarSign, MessageCircle, CreditCard, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCountUp } from '../hooks/useCountUp';
 import { useCarousel } from '../hooks/useCarousel';
@@ -6,10 +8,27 @@ interface LandingPageProps {
     onGetStarted: () => void;
 }
 
-// Sample testimonials data
-const testimonials = [
+interface Testimonial {
+    id: string;
+    name: string;
+    role: string;
+    rating: number;
+    text: string;
+    service: string;
+    avatar: string;
+}
+
+interface Category {
+    id: string;
+    name: string;
+    icon: any;
+    color: string;
+}
+
+// Fallback data in case of empty DB or error
+const fallbackTestimonials = [
     {
-        id: 1,
+        id: '1',
         name: "Sarah Johnson",
         role: "Client",
         rating: 5,
@@ -18,60 +37,146 @@ const testimonials = [
         avatar: "SJ"
     },
     {
-        id: 2,
+        id: '2',
         name: "Michael Chen",
         role: "Provider",
         rating: 5,
         text: "As a photographer, SkilXpress has been a game-changer. I get more bookings by showcasing my work through videos!",
         service: "Photography",
         avatar: "MC"
-    },
-    {
-        id: 3,
-        name: "Emily Rodriguez",
-        role: "Client",
-        rating: 5,
-        text: "The booking process was so smooth! I could see the provider's previous work and read reviews before booking. Perfect!",
-        service: "Haircut",
-        avatar: "ER"
-    },
-    {
-        id: 4,
-        name: "David Kim",
-        role: "Provider",
-        rating: 5,
-        text: "Best platform for service providers! The video feature really helps clients understand the quality of my work.",
-        service: "Auto Repair",
-        avatar: "DK"
-    },
-    {
-        id: 5,
-        name: "Lisa Thompson",
-        role: "Client",
-        rating: 5,
-        text: "I love how transparent everything is. Seeing the provider's skills through videos gave me confidence in my choice!",
-        service: "Cleaning",
-        avatar: "LT"
-    },
-    {
-        id: 6,
-        name: "James Wilson",
-        role: "Provider",
-        rating: 5,
-        text: "SkilXpress helped me grow my business significantly. The platform is easy to use and brings quality clients!",
-        service: "Electrical",
-        avatar: "JW"
     }
 ];
 
 export function LandingPage({ onGetStarted }: LandingPageProps) {
-    // Animated counters
-    const providersCount = useCountUp(10000);
-    const bookingsCount = useCountUp(50000);
-    const categoriesCount = useCountUp(100);
+    const [stats, setStats] = useState({
+        providers: 0,
+        bookings: 0,
+        categories: 0,
+        avgRating: 4.8
+    });
+    const [testimonials, setTestimonials] = useState<Testimonial[]>(fallbackTestimonials);
+    const [categories, setCategories] = useState<Category[]>([]);
+
+    // Animated counters - initialized with 0, updated when stats load
+    const providersCount = useCountUp(stats.providers);
+    const bookingsCount = useCountUp(stats.bookings);
+    const categoriesCount = useCountUp(stats.categories);
 
     // Testimonials carousel
     const { currentIndex, next, prev, goTo } = useCarousel(testimonials.length, 5000);
+
+    useEffect(() => {
+        fetchLandingData();
+    }, []);
+
+    const fetchLandingData = async () => {
+        try {
+            // 1. Fetch Stats
+            const { count: providers } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_type', 'provider');
+
+            const { count: bookings } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'completed');
+
+            const { count: catsCount } = await supabase
+                .from('skill_categories')
+                .select('*', { count: 'exact', head: true });
+
+            const { data: ratings } = await supabase
+                .from('ratings')
+                .select('rating');
+
+            const avgRating = (ratings as any[])?.length
+                ? (ratings as any[]).reduce((acc, curr) => acc + curr.rating, 0) / (ratings as any[]).length
+                : 4.8;
+
+            setStats({
+                providers: providers || 0,
+                bookings: bookings || 0,
+                categories: catsCount || 0,
+                avgRating: Number(avgRating.toFixed(1))
+            });
+
+            // 2. Fetch Testimonials (Recent 5-star reviews)
+            const { data: reviews } = await supabase
+                .from('ratings')
+                .select(`
+                    id,
+                    rating,
+                    review,
+                    created_at,
+                    profiles:client_id (
+                        full_name
+                    ),
+                    bookings (
+                        category_id
+                    )
+                `)
+                .eq('rating', 5)
+                .not('review', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(6);
+
+            if (reviews && reviews.length > 0) {
+                // Fetch category names for the bookings
+                const reviewsData = reviews as any[];
+                const categoryIds = [...new Set(reviewsData.map(r => r.bookings?.category_id).filter(Boolean))];
+                const { data: cats } = await supabase
+                    .from('skill_categories')
+                    .select('id, name')
+                    .in('id', categoryIds as string[]);
+
+                const catMap = new Map((cats as any[])?.map(c => [c.id, c.name]));
+
+                const formattedTestimonials: Testimonial[] = reviewsData.map(r => ({
+                    id: r.id,
+                    name: r.profiles?.full_name || 'Anonymous',
+                    role: 'Client',
+                    rating: r.rating,
+                    text: r.review || '',
+                    service: catMap.get(r.bookings?.category_id) || 'Service',
+                    avatar: (r.profiles?.full_name || 'A').charAt(0).toUpperCase() + ((r.profiles?.full_name || '').split(' ')[1] || '').charAt(0).toUpperCase()
+                }));
+                setTestimonials(formattedTestimonials);
+            }
+
+            // 3. Fetch Categories
+            const { data: fetchedCategories } = await supabase
+                .from('skill_categories')
+                .select('*')
+                .limit(6);
+
+            if (fetchedCategories) {
+                // Map icons dynamically if possible, or use a default set
+                const iconMap: Record<string, any> = {
+                    'Plumbing': Wrench,
+                    'Electrical': Zap,
+                    'Cleaning': HomeIcon,
+                    'Haircut': Scissors,
+                    'Auto Repair': Car,
+                    'Photography': Video,
+                    // Add defaults/fallbacks
+                };
+
+                const colors = ['blue', 'yellow', 'green', 'purple', 'red', 'pink'];
+
+                const formattedCategories = (fetchedCategories as any[]).map((c, idx) => ({
+                    id: c.id,
+                    name: c.name,
+                    icon: iconMap[c.name] || Wrench, // Fallback icon
+                    color: colors[idx % colors.length]
+                }));
+                setCategories(formattedCategories);
+            }
+
+        } catch (error) {
+            console.error('Error fetching landing page data:', error);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -152,7 +257,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                             <div className="flex items-center justify-center mb-2">
                                 <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
                             </div>
-                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">4.8/5</div>
+                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">{stats.avgRating}/5</div>
                             <div className="text-sm md:text-base text-gray-600 font-medium">Average Rating</div>
                         </div>
 
@@ -291,8 +396,8 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                                         key={index}
                                         onClick={() => goTo(index)}
                                         className={`w-2 h-2 rounded-full transition-all ${index === currentIndex
-                                                ? 'bg-blue-600 w-8'
-                                                : 'bg-gray-300 hover:bg-gray-400'
+                                            ? 'bg-blue-600 w-8'
+                                            : 'bg-gray-300 hover:bg-gray-400'
                                             }`}
                                         aria-label={`Go to testimonial ${index + 1}`}
                                     />
@@ -320,16 +425,9 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                        {[
-                            { icon: Wrench, name: 'Plumbing', color: 'blue' },
-                            { icon: Zap, name: 'Electrical', color: 'yellow' },
-                            { icon: HomeIcon, name: 'Cleaning', color: 'green' },
-                            { icon: Scissors, name: 'Haircut', color: 'purple' },
-                            { icon: Car, name: 'Auto Repair', color: 'red' },
-                            { icon: Video, name: 'Photography', color: 'pink' },
-                        ].map((category) => (
+                        {categories.length > 0 ? categories.map((category) => (
                             <button
-                                key={category.name}
+                                key={category.id}
                                 onClick={onGetStarted}
                                 className="group bg-white rounded-2xl p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-2 border-transparent hover:border-blue-600"
                             >
@@ -338,7 +436,12 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                                 </div>
                                 <h3 className="font-semibold text-gray-900">{category.name}</h3>
                             </button>
-                        ))}
+                        )) : (
+                            // Fallback/Loading state for categories
+                            [1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className="animate-pulse bg-gray-100 rounded-2xl p-6 h-40"></div>
+                            ))
+                        )}
                     </div>
                 </div>
             </section>

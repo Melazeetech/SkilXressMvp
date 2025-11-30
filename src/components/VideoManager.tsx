@@ -279,8 +279,8 @@ function VideoUploadForm({
                                 type="button"
                                 onClick={() => setUploadMethod('file')}
                                 className={`px-4 py-2.5 rounded-xl border font-medium transition-all ${uploadMethod === 'file'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
-                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
                                     }`}
                             >
                                 Upload File
@@ -289,8 +289,8 @@ function VideoUploadForm({
                                 type="button"
                                 onClick={() => setUploadMethod('url')}
                                 className={`px-4 py-2.5 rounded-xl border font-medium transition-all ${uploadMethod === 'url'
-                                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
-                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
                                     }`}
                             >
                                 Use URL
@@ -376,15 +376,56 @@ function VideoUploadForm({
                         </div>
                     ) : (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Video URL</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Video URL or TikTok Link
+                            </label>
                             <input
                                 type="url"
                                 value={videoUrl}
-                                onChange={(e) => setVideoUrl(e.target.value)}
+                                onChange={async (e) => {
+                                    const url = e.target.value;
+                                    setVideoUrl(url);
+
+                                    // Auto-detect TikTok links
+                                    if (url.includes('tiktok.com')) {
+                                        const { isTikTokUrl, getTikTokMetadata } = await import('../lib/tiktokHelpers');
+
+                                        if (isTikTokUrl(url)) {
+                                            // Try to fetch metadata
+                                            const metadata = await getTikTokMetadata(url);
+                                            if (metadata) {
+                                                if (!title && metadata.title) {
+                                                    setTitle(metadata.title);
+                                                }
+                                                if (!description && metadata.author_name) {
+                                                    setDescription(`Video by ${metadata.author_name}`);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }}
                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="https://example.com/video.mp4"
+                                placeholder="https://www.tiktok.com/@username/video/... or direct video URL"
                                 required={uploadMethod === 'url'}
                             />
+                            <p className="text-xs text-gray-500 mt-2">
+                                ✨ Supports TikTok links, direct video URLs, YouTube, and more!
+                            </p>
+                            {videoUrl && videoUrl.includes('tiktok.com') && (
+                                <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <svg className="w-5 h-5 text-purple-600 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+                                        </svg>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-purple-900">TikTok Link Detected!</p>
+                                            <p className="text-xs text-purple-700 mt-0.5">
+                                                We'll embed this video from TikTok. No upload needed!
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
