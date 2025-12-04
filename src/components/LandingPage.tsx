@@ -6,6 +6,7 @@ import { useCarousel } from '../hooks/useCarousel';
 
 interface LandingPageProps {
     onGetStarted: () => void;
+    onBrowse: () => void;
 }
 
 interface Testimonial {
@@ -47,7 +48,7 @@ const fallbackTestimonials = [
     }
 ];
 
-export function LandingPage({ onGetStarted }: LandingPageProps) {
+export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
     const [stats, setStats] = useState({
         providers: 0,
         bookings: 0,
@@ -211,7 +212,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
                                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
                             <button
-                                onClick={onGetStarted}
+                                onClick={onBrowse}
                                 className="bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg border-2 border-gray-200 hover:border-blue-600 hover:shadow-lg transition-all duration-300"
                             >
                                 Browse Services

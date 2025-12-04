@@ -33,6 +33,7 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
 function AppContent() {
   const { user, profile, signOut, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [providerProfileOpen, setProviderProfileOpen] = useState(false);
@@ -133,7 +134,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && (user || sharedVideoId) ? 'bg-transparent' : 'bg-blue-600 shadow-md'
+      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${currentView === 'feed' && (user || sharedVideoId || isGuest) ? 'bg-transparent' : 'bg-blue-600 shadow-md'
         }`}>
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-3">
@@ -220,6 +221,7 @@ function AppContent() {
                         signOut();
                         setMenuOpen(false);
                         setCurrentView('feed');
+                        setIsGuest(false);
                       }}
                       className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-gray-50 text-red-600"
                     >
@@ -241,11 +243,11 @@ function AppContent() {
         </div>
       </header>
 
-      <main className={`${currentView === 'feed' && (user || sharedVideoId) ? 'pt-0' : 'pt-14'}`}>
+      <main className={`${currentView === 'feed' && (user || sharedVideoId || isGuest) ? 'pt-0' : 'pt-14'}`}>
         {currentView === 'feed' ? (
           <>
 
-            {user || sharedVideoId ? (
+            {user || sharedVideoId || isGuest ? (
               <VideoFeed
                 searchQuery={searchQuery}
                 categoryFilter={categoryFilter}
@@ -259,7 +261,10 @@ function AppContent() {
                 sharedVideoId={sharedVideoId}
               />
             ) : (
-              <LandingPage onGetStarted={() => setAuthModalOpen(true)} />
+              <LandingPage
+                onGetStarted={() => setAuthModalOpen(true)}
+                onBrowse={() => setIsGuest(true)}
+              />
             )}
           </>
         ) : currentView === 'messages' ? (
