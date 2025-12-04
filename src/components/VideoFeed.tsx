@@ -550,6 +550,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         <div
           key={video.id}
           className="h-screen snap-start relative flex items-center justify-center bg-black"
+          style={{ scrollSnapStop: 'always' }}
         >
           <video
             ref={(el) => (videoRefs.current[index] = el)}
