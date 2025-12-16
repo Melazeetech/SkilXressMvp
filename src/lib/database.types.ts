@@ -26,6 +26,62 @@ export interface Database {
           last_read_notifications_at?: string
           created_at: string
           updated_at: string
+          status?: string
+          is_public?: boolean
+        }
+        Insert: {
+          id: string
+          email: string
+          full_name: string
+          user_type: 'client' | 'provider'
+          avatar_url?: string | null
+          bio?: string | null
+          phone?: string | null
+          location?: string | null
+          experience?: string | null
+          specialty?: string | null
+          followers_count?: number
+          following_count?: number
+          created_at?: string
+          updated_at?: string
+          status?: string
+          is_public?: boolean
+        }
+        Update: {
+          id?: string
+          email?: string
+          full_name?: string
+          user_type?: 'client' | 'provider'
+          avatar_url?: string | null
+          bio?: string | null
+          phone?: string | null
+          location?: string | null
+          experience?: string | null
+          specialty?: string | null
+          followers_count?: number
+          following_count?: number
+          created_at?: string
+          updated_at?: string
+          status?: string
+          is_public?: boolean
+        }
+      }
+      public_profiles: {
+        Row: {
+          id: string
+          email: string
+          full_name: string
+          user_type: 'client' | 'provider'
+          avatar_url: string | null
+          bio: string | null
+          phone: string | null
+          location: string | null
+          experience: string | null
+          specialty: string | null
+          followers_count: number
+          following_count: number
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id: string
@@ -322,6 +378,38 @@ export interface Database {
           image_url?: string
           created_at?: string
           updated_at?: string
+        }
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: 'like' | 'follow' | 'booking' | 'message'
+          title: string
+          message: string
+          read: boolean
+          data: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: 'like' | 'follow' | 'booking' | 'message'
+          title: string
+          message: string
+          read?: boolean
+          data?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: 'like' | 'follow' | 'booking' | 'message'
+          title?: string
+          message?: string
+          read?: boolean
+          data?: Json | null
+          created_at?: string
         }
       }
     }

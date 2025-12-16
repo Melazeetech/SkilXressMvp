@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Loader2, Camera, User, Lock, Eye, EyeOff, Shield, Trash2, LogOut, Settings, Mail, Phone, MapPin, FileText, Briefcase, Star } from 'lucide-react';
+import { X, Loader2, Camera, User, Lock, Eye, Shield, Trash2, LogOut, Settings, Phone, MapPin, Briefcase, Star, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -70,6 +70,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       const { error } = await supabase
         .from('profiles')
+        // @ts-ignore
         .update({
           full_name: fullName,
           bio: bio,
@@ -130,7 +131,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       const newValue = !isPublic;
       const { error } = await supabase
         .from('profiles')
-        .update({ is_public: newValue } as any)
+        // @ts-ignore
+        .update({ is_public: newValue })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -150,7 +152,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       // Soft delete or status update
       const { error } = await supabase
         .from('profiles')
-        .update({ status: 'deactivated' } as any)
+        // @ts-ignore
+        .update({ status: 'deactivated' })
         .eq('id', user.id);
 
       if (error) throw error;

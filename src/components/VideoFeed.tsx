@@ -10,7 +10,7 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { VideoViewsModal } from './VideoViewsModal';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
-  profiles: {
+  public_profiles: {
     full_name: string;
     avatar_url: string | null;
     location: string | null;
@@ -50,8 +50,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastScrollIndexRef = useRef<number>(0);
   const { user } = useAuth();
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
@@ -82,22 +80,45 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        scrollToIndex(Math.max(0, currentIndex - 1));
+        const newIndex = Math.max(0, currentIndex - 1);
+        scrollToIndex(newIndex);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        scrollToIndex(Math.min(videos.length - 1, currentIndex + 1));
+        const newIndex = Math.min(videos.length - 1, currentIndex + 1);
+        scrollToIndex(newIndex);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      // Cleanup scroll timeout on unmount
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
     };
   }, [currentIndex, videos.length]);
+
+  // Intersection Observer for active video detection
+  useEffect(() => {
+    const options = {
+      root: containerRef.current,
+      threshold: 0.6, // Trigger when 60% visible
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const index = videoRefs.current.findIndex((ref) => ref === entry.target);
+          if (index !== -1 && index !== currentIndex) {
+            setCurrentIndex(index);
+          }
+        }
+      });
+    }, options);
+
+    videoRefs.current.forEach((video) => {
+      if (video) observer.observe(video);
+    });
+
+    return () => observer.disconnect();
+  }, [videos]);
 
   const scrollToIndex = (index: number) => {
     if (containerRef.current) {
@@ -144,10 +165,11 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     try {
       const { error } = await supabase
         .from('video_views')
+        // @ts-ignore
         .insert({
           video_id: videoId,
           user_id: user.id
-        } as any);
+        });
 
       if (!error) {
         // Successfully recorded a new unique view
@@ -184,7 +206,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         .from('skill_videos')
         .select(`
           *,
-          profiles!skill_videos_provider_id_fkey (
+          public_profiles!skill_videos_provider_id_fkey (
             full_name,
             avatar_url,
             location
@@ -230,7 +252,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             .from('skill_videos')
             .select(`
               *,
-              profiles!skill_videos_provider_id_fkey (
+              public_profiles!skill_videos_provider_id_fkey (
                 full_name,
                 avatar_url,
                 location
@@ -295,11 +317,11 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       );
 
       // Filter out videos with missing profiles (e.g. due to RLS or deleted users)
-      const validVideos = videosWithLikes.filter((v: any) => v.profiles);
+      const validVideos = videosWithLikes.filter((v: any) => v.public_profiles);
 
       const filteredVideos = locationFilter
         ? validVideos.filter((v: Video) =>
-          v.profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
+          v.public_profiles?.location?.toLowerCase().includes(locationFilter.toLowerCase())
         )
         : validVideos;
 
@@ -355,10 +377,11 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       } else {
         const { error } = await supabase
           .from('video_likes')
+          // @ts-ignore
           .insert({
             video_id: video.id,
             user_id: user.id,
-          } as any);
+          });
 
         if (error) throw error;
       }
@@ -366,7 +389,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       // Update the count in skill_videos table
       await supabase
         .from('skill_videos')
-        .update({ likes_count: newLikesCount } as any)
+        // @ts-ignore
+        .update({ likes_count: newLikesCount })
         .eq('id', video.id);
 
     } catch (error) {
@@ -423,13 +447,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     try {
       // Get current counts first
       const { data: providerProfile } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('followers_count')
         .eq('id', video.provider_id)
         .single();
 
       const { data: userProfile } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('following_count')
         .eq('id', user.id)
         .single();
@@ -449,27 +473,12 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       } else {
         await supabase
           .from('followers')
+          // @ts-ignore
           .insert({
             follower_id: user.id,
             following_id: video.provider_id,
-          } as any);
-
-        newFollowerCount += 1;
-        newFollowingCount += 1;
+          });
       }
-
-      // Update provider's followers count
-      await supabase
-        .from('profiles')
-        .update({ followers_count: newFollowerCount } as any)
-        .eq('id', video.provider_id);
-
-      // Update user's following count
-      await supabase
-        .from('profiles')
-        .update({ following_count: newFollowingCount } as any)
-        .eq('id', user.id);
-
     } catch (error) {
       console.error('Error toggling follow:', error);
       // Revert optimistic update on error
@@ -484,30 +493,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   };
 
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const scrollTop = container.scrollTop;
-    const itemHeight = container.clientHeight;
-    const newIndex = Math.round(scrollTop / itemHeight);
 
-    // Clear any pending scroll timeout
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-
-    // Debounce the index update to prevent rapid changes
-    scrollTimeoutRef.current = setTimeout(() => {
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
-        // Snap to the exact position after user stops scrolling
-        container.scrollTo({
-          top: newIndex * itemHeight,
-          behavior: 'smooth'
-        });
-        setCurrentIndex(newIndex);
-        lastScrollIndexRef.current = newIndex;
-      }
-    }, 150); // 150ms debounce - adjust if needed
-  };
 
   if (loading) {
     return (
@@ -544,7 +530,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     <div
       ref={containerRef}
       className="h-screen overflow-y-auto snap-y snap-mandatory scrollbar-hide"
-      onScroll={handleScroll}
     >
       {videos.map((video, index) => (
         <div
@@ -558,6 +543,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             className="h-full w-full object-cover"
             loop
             playsInline
+            preload={Math.abs(index - currentIndex) <= 1 ? "auto" : "none"}
             onClick={handleVideoClick}
             onPlay={() => index === currentIndex && setIsPlaying(true)}
             onPause={() => index === currentIndex && setIsPlaying(false)}
@@ -657,16 +643,16 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               <div className="flex-1">
                 <div className="flex items-center mb-3 cursor-pointer" onClick={() => onProviderClick?.(video.provider_id)}>
                   <div className="relative mr-3">
-                    {video.profiles?.avatar_url ? (
+                    {video.public_profiles?.avatar_url ? (
                       <img
-                        src={video.profiles.avatar_url}
-                        alt={video.profiles.full_name}
+                        src={video.public_profiles.avatar_url}
+                        alt={video.public_profiles.full_name}
                         className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white flex items-center justify-center shadow-md">
                         <span className="text-lg font-bold text-white">
-                          {video.profiles?.full_name.charAt(0)}
+                          {video.public_profiles?.full_name.charAt(0)}
                         </span>
                       </div>
                     )}
@@ -687,7 +673,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2">
-                        {video.profiles?.full_name}
+                        {video.public_profiles?.full_name}
                       </h3>
                       {(video.average_rating || 0) > 0 && (
                         <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full">
@@ -700,10 +686,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                       <span className="bg-white/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
                         {video.skill_categories?.name}
                       </span>
-                      {video.profiles?.location && (
+                      {video.public_profiles?.location && (
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3" />
-                          {video.profiles.location}
+                          {video.public_profiles.location}
                         </span>
                       )}
                     </div>

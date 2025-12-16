@@ -21,7 +21,7 @@ interface SearchBarProps {
   onClose: () => void;
 }
 
-export function SearchBar({ onSearch, onCategoryFilter, onLocationFilter, onClose }: SearchBarProps) {
+export function SearchBar({ onSearch, onClose }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Video[]>([]);
   const [loading, setLoading] = useState(false);

@@ -41,6 +41,7 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
     try {
       const { error } = await supabase
         .from('bookings')
+        // @ts-ignore
         .insert({
           client_id: user.id,
           provider_id: video.provider_id,

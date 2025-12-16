@@ -94,11 +94,7 @@ export function FollowButton({
 
                 if (error) throw error;
 
-                // Update provider's followers count directly
-                await supabase
-                    .from('profiles')
-                    .update({ followers_count: Math.max(0, followersCount - 1) } as any)
-                    .eq('id', providerId);
+
 
             } else {
                 // Follow
@@ -111,11 +107,7 @@ export function FollowButton({
 
                 if (error) throw error;
 
-                // Update provider's followers count directly
-                await supabase
-                    .from('profiles')
-                    .update({ followers_count: followersCount + 1 } as any)
-                    .eq('id', providerId);
+
             }
         } catch (error) {
             console.error('Error toggling follow:', error);

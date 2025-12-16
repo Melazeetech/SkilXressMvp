@@ -71,7 +71,8 @@ export function Chat({ booking, onClose }: ChatProps) {
 
       await supabase
         .from('chat_messages')
-        .update({ is_read: true } as any)
+        // @ts-ignore
+        .update({ is_read: true })
         .eq('booking_id', booking.id)
         .neq('sender_id', user?.id || '');
     } catch (error) {
@@ -100,7 +101,8 @@ export function Chat({ booking, onClose }: ChatProps) {
           if (payload.new.sender_id !== user?.id) {
             supabase
               .from('chat_messages')
-              .update({ is_read: true } as any)
+              // @ts-ignore
+              .update({ is_read: true })
               .eq('id', payload.new.id);
           }
         }
@@ -222,6 +224,7 @@ export function Chat({ booking, onClose }: ChatProps) {
         file_url: fileUrl,
         file_name: fileName,
         file_size: fileSize,
+        // @ts-ignore
       } as any);
 
       if (error) throw error;

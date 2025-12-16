@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Video, Calendar, Star, ArrowRight, Wrench, Home as HomeIcon, Scissors, Car, Zap, Users, CheckCircle, Shield, Clock, DollarSign, MessageCircle, CreditCard, Smartphone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCountUp } from '../hooks/useCountUp';
 import { useCarousel } from '../hooks/useCarousel';
+import { InstallPWA } from './InstallPWA';
 
 interface LandingPageProps {
     onGetStarted: () => void;
@@ -74,7 +75,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
         try {
             // 1. Fetch Stats
             const { count: providers } = await supabase
-                .from('profiles')
+                .from('public_profiles')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_type', 'provider');
 
@@ -110,9 +111,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
                     rating,
                     review,
                     created_at,
-                    profiles:client_id (
-                        full_name
-                    ),
+                    client_id,
                     bookings (
                         category_id
                     )
@@ -133,15 +132,25 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
 
                 const catMap = new Map((cats as any[])?.map(c => [c.id, c.name]));
 
-                const formattedTestimonials: Testimonial[] = reviewsData.map(r => ({
-                    id: r.id,
-                    name: r.profiles?.full_name || 'Anonymous',
-                    role: 'Client',
-                    rating: r.rating,
-                    text: r.review || '',
-                    service: catMap.get(r.bookings?.category_id) || 'Service',
-                    avatar: (r.profiles?.full_name || 'A').charAt(0).toUpperCase() + ((r.profiles?.full_name || '').split(' ')[1] || '').charAt(0).toUpperCase()
-                }));
+                const formattedTestimonials: Testimonial[] = [];
+
+                for (const r of reviewsData) {
+                    const { data: profile } = await supabase
+                        .from('public_profiles')
+                        .select('full_name')
+                        .eq('id', r.client_id)
+                        .single() as any;
+
+                    formattedTestimonials.push({
+                        id: r.id,
+                        name: profile?.full_name || 'Anonymous',
+                        role: 'Client',
+                        rating: r.rating,
+                        text: r.review || '',
+                        service: catMap.get(r.bookings?.category_id) || 'Service',
+                        avatar: (profile?.full_name || 'A').charAt(0).toUpperCase() + ((profile?.full_name || '').split(' ')[1] || '').charAt(0).toUpperCase()
+                    });
+                }
                 setTestimonials(formattedTestimonials);
             }
 
@@ -217,6 +226,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
                             >
                                 Browse Services
                             </button>
+                            <InstallPWA />
                         </div>
                     </div>
                 </div>
@@ -344,7 +354,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
                     <div className="relative">
                         {/* Testimonials Grid */}
                         <div className="grid md:grid-cols-3 gap-6 mb-8">
-                            {testimonials.slice(currentIndex, currentIndex + 3).map((testimonial, idx) => {
+                            {testimonials.slice(currentIndex, currentIndex + 3).map((_, idx) => {
                                 const actualIndex = (currentIndex + idx) % testimonials.length;
                                 const actualTestimonial = testimonials[actualIndex];
 

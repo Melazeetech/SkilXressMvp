@@ -71,7 +71,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
         try {
             // Load provider profile
             const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
+                .from('public_profiles')
                 .select('*')
                 .eq('id', providerId)
                 .single();
@@ -105,7 +105,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                 .from('ratings')
                 .select(`
           *,
-          client_profile:profiles!ratings_client_id_fkey (
+          client_profile:public_profiles!ratings_client_id_fkey (
             full_name,
             avatar_url
           )
@@ -142,19 +142,26 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                 .eq('client_id', user.id)
                 .eq('provider_id', providerId)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                .maybeSingle();
 
             if (existingBooking) {
+                // @ts-ignore
                 onMessageClick(existingBooking.id);
             } else {
                 // Create a new "inquiry" booking to start conversation
+                if (videos.length === 0) {
+                    toast.error('Cannot start conversation: Provider has no service categories');
+                    setMessageLoading(false);
+                    return;
+                }
+
                 const { data: newBooking, error } = await supabase
                     .from('bookings')
                     .insert({
+                        // @ts-ignore
                         client_id: user.id,
                         provider_id: providerId,
-                        category_id: videos[0]?.category_id || '',
+                        category_id: videos[0]?.category_id,
                         status: 'pending',
                         preferred_date: new Date().toISOString().split('T')[0],
                         preferred_time: '12:00 PM',
@@ -167,6 +174,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                 if (error) throw error;
 
                 if (newBooking) {
+                    // @ts-ignore
                     onMessageClick(newBooking.id);
                     toast.success('Conversation started!');
                 }

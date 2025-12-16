@@ -91,7 +91,8 @@ export function NotificationsView() {
 
             const { error } = await supabase
                 .from('notifications')
-                .update({ read: true } as any)
+                // @ts-ignore
+                .update({ read: true })
                 .eq('id', id);
 
             if (error) throw error;
@@ -111,7 +112,8 @@ export function NotificationsView() {
 
             const { error } = await supabase
                 .from('notifications')
-                .update({ read: true } as any)
+                // @ts-ignore
+                .update({ read: true })
                 .eq('user_id', user.id)
                 .eq('read', false);
 
@@ -209,9 +211,9 @@ export function NotificationsView() {
                                 }`}
                         >
                             <div className={`mt-1 p-2 rounded-full flex-shrink-0 shadow-sm ${notification.type === 'like' ? 'bg-red-100 text-red-600' :
-                                    notification.type === 'follow' ? 'bg-blue-100 text-blue-600' :
-                                        notification.type === 'booking' ? 'bg-green-100 text-green-600' :
-                                            'bg-purple-100 text-purple-600'
+                                notification.type === 'follow' ? 'bg-blue-100 text-blue-600' :
+                                    notification.type === 'booking' ? 'bg-green-100 text-green-600' :
+                                        'bg-purple-100 text-purple-600'
                                 }`}>
                                 {notification.type === 'like' && <Heart className="w-5 h-5 fill-current" />}
                                 {notification.type === 'follow' && <UserPlus className="w-5 h-5" />}
