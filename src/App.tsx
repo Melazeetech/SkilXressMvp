@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Home, User, LogOut, Menu, X, MessageSquare, Bell, Search } from 'lucide-react';
+import { Home, User, LogOut, Menu, X, MessageSquare, Bell, Search, Shield } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/AuthModal';
 import { VideoFeed } from './components/VideoFeed';
@@ -9,6 +11,7 @@ import { ProviderDashboard } from './components/ProviderDashboard';
 import { ClientDashboard } from './components/ClientDashboard';
 import { ProfileModal } from './components/ProfileModal';
 import { LandingPage } from './components/LandingPage';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
 import { ProviderProfilePage } from './components/ProviderProfilePage';
 import { MessagesView } from './components/MessagesView';
 import { NotificationsView } from './components/NotificationsView';
@@ -48,12 +51,14 @@ function AppContent() {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   // Handle back button for modals and views
   useBackHandler(authModalOpen, () => setAuthModalOpen(false), 'auth-modal');
   useBackHandler(bookingModalOpen, () => setBookingModalOpen(false), 'booking-modal');
   useBackHandler(profileModalOpen, () => setProfileModalOpen(false), 'profile-modal');
   useBackHandler(searchModalOpen, () => setSearchModalOpen(false), 'search-modal');
+  useBackHandler(privacyOpen, () => setPrivacyOpen(false), 'privacy-policy');
   useBackHandler(providerProfileOpen, () => {
     setProviderProfileOpen(false);
     setSelectedProviderId(null);
@@ -218,6 +223,16 @@ function AppContent() {
                     </button>
                     <button
                       onClick={() => {
+                        setPrivacyOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-gray-50 text-gray-700"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Privacy Policy
+                    </button>
+                    <button
+                      onClick={() => {
                         signOut();
                         setMenuOpen(false);
                         setCurrentView('feed');
@@ -284,6 +299,7 @@ function AppContent() {
 
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
       <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
+      <PrivacyPolicy isOpen={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       <BookingModal
         isOpen={bookingModalOpen}
         onClose={() => setBookingModalOpen(false)}
@@ -326,6 +342,8 @@ function AppContent() {
           onClose={() => setSearchModalOpen(false)}
         />
       )}
+      <Analytics />
+      <SpeedInsights />
     </div>
   );
 }

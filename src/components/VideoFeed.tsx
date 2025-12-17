@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,6 +46,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [viewsModalOpen, setViewsModalOpen] = useState(false);
   const [videoForViews, setVideoForViews] = useState<Video | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         e.preventDefault();
         const newIndex = Math.min(videos.length - 1, currentIndex + 1);
         scrollToIndex(newIndex);
+      } else if (e.key === 'm') {
+        // Toggle mute with keyboard
+        const video = videoRefs.current[currentIndex];
+        if (video) {
+          video.muted = !video.muted;
+          setIsMuted(video.muted);
+        }
       }
     };
 
@@ -134,15 +143,32 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       videoRefs.current.forEach((video, index) => {
         if (video) {
           if (index === currentIndex) {
+            // Reset mute state for new video if needed, or persist user preference.
+            // For now, let's persist the 'isMuted' state across videos if we want, 
+            // OR reset it. Usually feeds persist mute state. 
+            // But we need to sync the video element with the state.
+            // However, browsers block unmuted autoplay.
+
+            // Try playing
             const playPromise = video.play();
             if (playPromise !== undefined) {
-              playPromise.catch((error) => {
+              playPromise.then(() => {
+                setIsPlaying(true);
+              }).catch((error) => {
                 console.log("Autoplay prevented:", error);
-                // Try to play anyway, browser might block unmuted autoplay until interaction
-                // We removed the auto-mute fallback to respect user's wish for sound
+                // Fallback to muted autoplay
+                video.muted = true;
+                video.play().then(() => {
+                  setIsMuted(true);
+                  setIsPlaying(true);
+                }).catch(e => {
+                  console.error("Muted autoplay also failed", e);
+                  setIsPlaying(false);
+                });
               });
+            } else {
+              setIsPlaying(true);
             }
-            setIsPlaying(true);
 
             // Increment view count if not already viewed in this session
             const currentVideo = videos[index];
@@ -189,11 +215,32 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
   const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    if (video.paused) {
-      video.play();
-    } else {
-      video.pause();
+
+    // Clear any existing timeout (handling double click case)
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+      return;
     }
+
+    // Set a new timeout to delay the single click action
+    clickTimeoutRef.current = setTimeout(() => {
+      if (video.paused) {
+        video.play();
+        setIsPlaying(true);
+      } else {
+        video.pause();
+        setIsPlaying(false);
+      }
+
+      // Also unmute if playing
+      if (video.muted) {
+        video.muted = false;
+        setIsMuted(false);
+      }
+
+      clickTimeoutRef.current = null;
+    }, 250); // 250ms delay to wait for potential double click
   };
 
   const [error, setError] = useState<string | null>(null);
@@ -417,6 +464,12 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   };
 
   const handleDoubleTap = (e: React.MouseEvent, video: Video) => {
+    // Clear any pending single click action
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -557,6 +610,23 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 <Play className="w-12 h-12 text-white fill-white" />
               </div>
             </div>
+          )}
+
+          {/* Mute Icon Overlay - Small indicator */}
+          {isMuted && index === currentIndex && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const el = videoRefs.current[index];
+                if (el) {
+                  el.muted = false;
+                  setIsMuted(false);
+                }
+              }}
+              className="absolute top-20 right-4 p-2 bg-black/40 rounded-full backdrop-blur-sm z-30 animate-in fade-in zoom-in duration-200"
+            >
+              <VolumeX className="w-6 h-6 text-white" />
+            </button>
           )}
 
           {/* Heart Animations */}
