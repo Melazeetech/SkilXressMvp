@@ -75,7 +75,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
         try {
             // 1. Fetch Stats
             const { count: providers } = await supabase
-                .from('public_profiles')
+                .from('profiles')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_type', 'provider');
 
@@ -114,6 +114,9 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
                     client_id,
                     bookings (
                         category_id
+                    ),
+                    profiles!ratings_client_id_fkey (
+                        full_name
                     )
                 `)
                 .eq('rating', 5)
@@ -136,7 +139,7 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
 
                 for (const r of reviewsData) {
                     const { data: profile } = await supabase
-                        .from('public_profiles')
+                        .from('profiles')
                         .select('full_name')
                         .eq('id', r.client_id)
                         .single() as any;
@@ -189,21 +192,21 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="min-h-screen bg-primary font-balthazar">
             {/* Hero Section */}
             <section className="relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 backdrop-blur-3xl"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-secondary-orange/5 to-secondary-cyan/5 backdrop-blur-3xl"></div>
                 <div className="relative z-10 max-w-7xl mx-auto px-4 py-20 sm:py-32">
                     <div className="text-center">
-                        <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-pulse">
+                        <div className="inline-flex items-center gap-2 bg-secondary-orange/20 text-secondary-orange px-4 py-2 rounded-full text-sm font-bold mb-6 animate-pulse">
                             <Sparkles className="w-4 h-4" />
                             <span>Discover Skills Through Video</span>
                         </div>
 
-                        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+                        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-secondary-black mb-6 leading-tight">
                             Find Skilled Professionals
                             <br />
-                            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-secondary-orange to-secondary-cyan bg-clip-text text-transparent">
                                 Through Video
                             </span>
                         </h1>
@@ -215,14 +218,14 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                             <button
                                 onClick={onGetStarted}
-                                className="group bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
+                                className="group bg-gradient-to-r from-secondary-orange to-secondary-cyan text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center gap-2"
                             >
                                 Get Started
                                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
                             <button
                                 onClick={onBrowse}
-                                className="bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg border-2 border-gray-200 hover:border-blue-600 hover:shadow-lg transition-all duration-300"
+                                className="bg-primary text-secondary-black px-8 py-4 rounded-xl font-bold text-lg border-2 border-secondary-black hover:border-secondary-orange hover:shadow-lg transition-all duration-300"
                             >
                                 Browse Services
                             </button>
@@ -238,49 +241,49 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
             </section>
 
             {/* Platform Statistics Section */}
-            <section className="py-16 bg-white border-y border-gray-200">
+            <section className="py-16 bg-primary border-y border-secondary-black/10">
                 <div className="max-w-7xl mx-auto px-4">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                         {/* Service Providers */}
-                        <div ref={providersCount.ref} className="text-center">
+                        <div ref={providersCount.ref} className="text-center font-balthazar">
                             <div className="flex items-center justify-center mb-2">
-                                <Users className="w-8 h-8 text-blue-600" />
+                                <Users className="w-8 h-8 text-secondary-orange" />
                             </div>
-                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">
+                            <div className="text-4xl md:text-5xl font-bold text-secondary-black mb-1">
                                 {providersCount.count.toLocaleString()}+
                             </div>
-                            <div className="text-sm md:text-base text-gray-600 font-medium">Service Providers</div>
+                            <div className="text-sm md:text-base text-secondary-black/70 font-bold uppercase tracking-wider">Service Providers</div>
                         </div>
 
                         {/* Bookings Completed */}
-                        <div ref={bookingsCount.ref} className="text-center">
+                        <div ref={bookingsCount.ref} className="text-center font-balthazar">
                             <div className="flex items-center justify-center mb-2">
-                                <CheckCircle className="w-8 h-8 text-green-600" />
+                                <CheckCircle className="w-8 h-8 text-secondary-cyan" />
                             </div>
-                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">
+                            <div className="text-4xl md:text-5xl font-bold text-secondary-black mb-1">
                                 {bookingsCount.count.toLocaleString()}+
                             </div>
-                            <div className="text-sm md:text-base text-gray-600 font-medium">Bookings Completed</div>
+                            <div className="text-sm md:text-base text-secondary-black/70 font-bold uppercase tracking-wider">Bookings Completed</div>
                         </div>
 
                         {/* Average Rating */}
-                        <div className="text-center">
+                        <div className="text-center font-balthazar">
                             <div className="flex items-center justify-center mb-2">
-                                <Star className="w-8 h-8 text-yellow-500 fill-yellow-500" />
+                                <Star className="w-8 h-8 text-secondary-yellow fill-secondary-yellow" />
                             </div>
-                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">{stats.avgRating}/5</div>
-                            <div className="text-sm md:text-base text-gray-600 font-medium">Average Rating</div>
+                            <div className="text-4xl md:text-5xl font-bold text-secondary-black mb-1">{stats.avgRating}/5</div>
+                            <div className="text-sm md:text-base text-secondary-black/70 font-bold uppercase tracking-wider">Average Rating</div>
                         </div>
 
                         {/* Service Categories */}
-                        <div ref={categoriesCount.ref} className="text-center">
+                        <div ref={categoriesCount.ref} className="text-center font-balthazar">
                             <div className="flex items-center justify-center mb-2">
-                                <Zap className="w-8 h-8 text-purple-600" />
+                                <Zap className="w-8 h-8 text-secondary-cyan" />
                             </div>
-                            <div className="text-4xl md:text-5xl font-bold text-gray-900 mb-1">
+                            <div className="text-4xl md:text-5xl font-bold text-secondary-black mb-1">
                                 {categoriesCount.count}+
                             </div>
-                            <div className="text-sm md:text-base text-gray-600 font-medium">Service Categories</div>
+                            <div className="text-sm md:text-base text-secondary-black/70 font-bold uppercase tracking-wider">Service Categories</div>
                         </div>
                     </div>
                 </div>
@@ -296,16 +299,16 @@ export function LandingPage({ onGetStarted, onBrowse }: LandingPageProps) {
 
                     <div className="grid md:grid-cols-3 gap-8">
                         <div className="relative group">
-                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
-                                <div className="bg-blue-600 text-white w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                            <div className="bg-gradient-to-br from-secondary-orange/5 to-secondary-orange/10 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-secondary-orange/10">
+                                <div className="bg-secondary-orange text-white w-16 h-16 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-secondary-orange/20">
                                     <Video className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-3">1. Watch Videos</h3>
-                                <p className="text-gray-600">
+                                <h3 className="text-2xl font-bold text-secondary-black mb-3 italic">1. Watch Videos</h3>
+                                <p className="text-secondary-black/70 font-bold">
                                     Browse through skill videos from verified service providers. See their work in action before you book.
                                 </p>
                             </div>
-                            <div className="absolute -top-4 -right-4 bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                            <div className="absolute -top-4 -right-4 bg-secondary-orange text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl shadow-lg ring-4 ring-primary">
                                 1
                             </div>
                         </div>

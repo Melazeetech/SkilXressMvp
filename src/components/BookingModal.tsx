@@ -6,7 +6,7 @@ import { Database } from '../lib/database.types';
 import { toast } from 'react-hot-toast';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
-  profiles: {
+  public_profiles: {
     full_name: string;
     avatar_url: string | null;
     location: string | null;
@@ -84,7 +84,7 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h3 className="text-2xl font-bold mb-2">Booking Confirmed!</h3>
             <p className="text-gray-600">
-              Your booking request has been sent to {video.profiles.full_name}
+              Your booking request has been sent to {video.public_profiles.full_name}
             </p>
           </div>
         ) : (
@@ -92,21 +92,21 @@ export function BookingModal({ isOpen, onClose, video }: BookingModalProps) {
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-start justify-between">
                 <div className="flex items-center">
-                  {video.profiles.avatar_url ? (
+                  {video.public_profiles.avatar_url ? (
                     <img
-                      src={video.profiles.avatar_url}
-                      alt={video.profiles.full_name}
+                      src={video.public_profiles.avatar_url}
+                      alt={video.public_profiles.full_name}
                       className="w-12 h-12 rounded-full mr-3"
                     />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center">
                       <span className="text-lg font-bold text-gray-600">
-                        {video.profiles.full_name.charAt(0)}
+                        {video.public_profiles.full_name.charAt(0)}
                       </span>
                     </div>
                   )}
                   <div>
-                    <h2 className="text-xl font-bold">{video.profiles.full_name}</h2>
+                    <h2 className="text-xl font-bold">{video.public_profiles.full_name}</h2>
                     <p className="text-gray-600">{video.skill_categories.name}</p>
                   </div>
                 </div>

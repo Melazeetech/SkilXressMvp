@@ -259,11 +259,20 @@ export function ProviderDashboard() {
                       key={video.id}
                       className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                     >
-                      <video
-                        src={video.video_url}
-                        className="w-full h-48 object-cover"
-                        controls
-                      />
+                      <div className="relative">
+                        <video
+                          src={video.video_url}
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm ${video.status === 'approved' ? 'bg-green-500 text-white' :
+                            video.status === 'rejected' ? 'bg-red-500 text-white' :
+                              'bg-yellow-500 text-white'
+                            }`}>
+                            {video.status}
+                          </span>
+                        </div>
+                      </div>
                       <div className="p-4">
                         <h3 className="font-semibold mb-1">{video.title}</h3>
                         <p className="text-sm text-gray-600 mb-2">
@@ -518,6 +527,8 @@ function VideoUploadForm({
         video_url: finalVideoUrl,
         title,
         description: description || null,
+        // @ts-ignore
+        status: 'pending'
       };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

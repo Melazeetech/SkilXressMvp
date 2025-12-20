@@ -14,7 +14,7 @@ export interface Database {
           id: string
           email: string
           full_name: string
-          user_type: 'client' | 'provider'
+          user_type: 'client' | 'provider' | 'admin'
           avatar_url: string | null
           bio: string | null
           phone: string | null
@@ -28,12 +28,13 @@ export interface Database {
           updated_at: string
           status?: string
           is_public?: boolean
+          is_verified?: boolean
         }
         Insert: {
           id: string
           email: string
           full_name: string
-          user_type: 'client' | 'provider'
+          user_type: 'client' | 'provider' | 'admin'
           avatar_url?: string | null
           bio?: string | null
           phone?: string | null
@@ -51,7 +52,7 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string
-          user_type?: 'client' | 'provider'
+          user_type?: 'client' | 'provider' | 'admin'
           avatar_url?: string | null
           bio?: string | null
           phone?: string | null
@@ -71,7 +72,7 @@ export interface Database {
           id: string
           email: string
           full_name: string
-          user_type: 'client' | 'provider'
+          user_type: 'client' | 'provider' | 'admin'
           avatar_url: string | null
           bio: string | null
           phone: string | null
@@ -82,12 +83,13 @@ export interface Database {
           following_count: number
           created_at: string
           updated_at: string
+          is_verified?: boolean
         }
         Insert: {
           id: string
           email: string
           full_name: string
-          user_type: 'client' | 'provider'
+          user_type: 'client' | 'provider' | 'admin'
           avatar_url?: string | null
           bio?: string | null
           phone?: string | null
@@ -98,12 +100,13 @@ export interface Database {
           following_count?: number
           created_at?: string
           updated_at?: string
+          is_verified?: boolean
         }
         Update: {
           id?: string
           email?: string
           full_name?: string
-          user_type?: 'client' | 'provider'
+          user_type?: 'client' | 'provider' | 'admin'
           avatar_url?: string | null
           bio?: string | null
           phone?: string | null
@@ -114,6 +117,7 @@ export interface Database {
           following_count?: number
           created_at?: string
           updated_at?: string
+          is_verified?: boolean
         }
       }
       skill_categories: {
@@ -172,6 +176,7 @@ export interface Database {
           likes_count: number
           views_count: number
           created_at: string
+          status: 'pending' | 'approved' | 'rejected'
         }
         Insert: {
           id?: string
@@ -185,6 +190,7 @@ export interface Database {
           likes_count?: number
           views_count?: number
           created_at?: string
+          status?: 'pending' | 'approved' | 'rejected'
         }
         Update: {
           id?: string
@@ -198,6 +204,7 @@ export interface Database {
           likes_count?: number
           views_count?: number
           created_at?: string
+          status?: 'pending' | 'approved' | 'rejected'
         }
       }
       video_likes: {
@@ -384,7 +391,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          type: 'like' | 'follow' | 'booking' | 'message'
+          type: 'like' | 'follow' | 'booking' | 'message' | 'video_approval'
           title: string
           message: string
           read: boolean
@@ -394,7 +401,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          type: 'like' | 'follow' | 'booking' | 'message'
+          type: 'like' | 'follow' | 'booking' | 'message' | 'video_approval'
           title: string
           message: string
           read?: boolean
@@ -404,7 +411,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          type?: 'like' | 'follow' | 'booking' | 'message'
+          type?: 'like' | 'follow' | 'booking' | 'message' | 'video_approval'
           title?: string
           message?: string
           read?: boolean

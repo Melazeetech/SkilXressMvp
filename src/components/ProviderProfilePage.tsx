@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical } from 'lucide-react';
+import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { FollowButton } from './FollowButton';
@@ -71,7 +71,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
         try {
             // Load provider profile
             const { data: profileData, error: profileError } = await supabase
-                .from('public_profiles')
+                .from('profiles')
                 .select('*')
                 .eq('id', providerId)
                 .single();
@@ -105,7 +105,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                 .from('ratings')
                 .select(`
           *,
-          client_profile:public_profiles!ratings_client_id_fkey (
+          client_profile:profiles!ratings_client_id_fkey (
             full_name,
             avatar_url
           )
@@ -251,7 +251,12 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
 
                     {/* Info */}
                     <div className="flex-1 text-center sm:text-left pt-2 sm:pt-14">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-1">{provider.full_name}</h1>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-1 flex items-center justify-center sm:justify-start gap-2">
+                            {provider.full_name}
+                            {provider.is_verified && (
+                                <CheckCircle className="w-6 h-6 text-blue-500 fill-blue-500" />
+                            )}
+                        </h1>
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1 text-gray-600 text-sm mb-4">
                             <span className="font-medium text-black">@{provider.full_name.toLowerCase().replace(/\s+/g, '')}</span>
                             <span>•</span>

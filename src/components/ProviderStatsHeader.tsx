@@ -1,4 +1,4 @@
-import { Users, Eye, MapPin, TrendingUp, Star, Briefcase, Video } from 'lucide-react';
+import { Users, Eye, MapPin, TrendingUp, Star, Briefcase, Video, CheckCircle, ShieldCheck } from 'lucide-react';
 
 interface ProviderStatsHeaderProps {
     profile: {
@@ -9,6 +9,7 @@ interface ProviderStatsHeaderProps {
         specialty: string | null;
         bio: string | null;
         followers_count: number;
+        is_verified?: boolean;
     } | null;
     stats: {
         totalVideos: number;
@@ -22,7 +23,7 @@ export function ProviderStatsHeader({ profile, stats }: ProviderStatsHeaderProps
     if (!profile) return null;
 
     return (
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 md:p-8 mb-8 text-white shadow-lg">
+        <div className="bg-gradient-to-br from-secondary-black via-slate-900 to-secondary-black rounded-2xl p-6 md:p-8 mb-8 text-white shadow-xl border border-white/10">
             <div className="flex flex-col md:flex-row gap-6">
                 {/* Avatar and Basic Info */}
                 <div className="flex items-start gap-4">
@@ -40,7 +41,12 @@ export function ProviderStatsHeader({ profile, stats }: ProviderStatsHeaderProps
                         </div>
                     )}
                     <div className="flex-1">
-                        <h1 className="text-2xl md:text-3xl font-bold mb-1">{profile.full_name || 'Provider'}</h1>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-2xl md:text-3xl font-bold">{profile.full_name || 'Provider'}</h1>
+                            {profile.is_verified && (
+                                <CheckCircle className="w-6 h-6 text-cyan-400 fill-cyan-400/20" />
+                            )}
+                        </div>
                         <div className="flex flex-wrap items-center gap-3 text-blue-100 text-sm mb-3">
                             {profile.location && (
                                 <div className="flex items-center gap-1">
@@ -59,6 +65,12 @@ export function ProviderStatsHeader({ profile, stats }: ProviderStatsHeaderProps
                             <div className="inline-block bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium mb-3">
                                 <Star className="w-3 h-3 inline mr-1" />
                                 {profile.specialty}
+                            </div>
+                        )}
+                        {profile.is_verified && (
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 bg-cyan-400/10 w-fit px-3 py-1 rounded-full border border-cyan-400/20 mt-1">
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                VERIFIED PROVIDER
                             </div>
                         )}
                     </div>

@@ -1,6 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Balthazar&family=Outfit:wght@500;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --primary: #ffffff;
+  --secondary-orange: #f57c00;
+  --secondary-yellow: #ffeb3b;
+  --secondary-cyan: #00BCD4;
+  --secondary-black: #000000;
+}
+
+body {
+  font-family: 'Balthazar', serif;
+  background-color: var(--primary);
+  color: var(--secondary-black);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-bold {
+  font-family: 'Outfit', sans-serif;
+}
 
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -15,12 +41,15 @@
   0% {
     transform: translate(0px, 0px) scale(1);
   }
+
   33% {
     transform: translate(30px, -50px) scale(1.1);
   }
+
   66% {
     transform: translate(-20px, 20px) scale(0.9);
   }
+
   100% {
     transform: translate(0px, 0px) scale(1);
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX } from 'lucide-react';
+import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +14,7 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
     full_name: string;
     avatar_url: string | null;
     location: string | null;
+    is_verified?: boolean;
   };
   skill_categories: {
     name: string;
@@ -28,12 +29,13 @@ interface VideoFeedProps {
   searchQuery?: string;
   locationFilter?: string;
   onBookClick: (video: Video) => void;
-  onProviderClick?: (providerId: string) => void;
+  onProviderClick: (providerId: string) => void;
   onAuthRequired?: () => void;
   sharedVideoId?: string | null;
+  isActive?: boolean;
 }
 
-export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick, onProviderClick, onAuthRequired, sharedVideoId }: VideoFeedProps) {
+export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookClick, onProviderClick, onAuthRequired, sharedVideoId, isActive = true }: VideoFeedProps) {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -108,7 +110,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   useEffect(() => {
     const options = {
       root: containerRef.current,
-      threshold: 0.6, // Trigger when 60% visible
+      threshold: 0.7, // Trigger when 70% visible
     };
 
     const observer = new IntersectionObserver((entries) => {
@@ -127,7 +129,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     });
 
     return () => observer.disconnect();
-  }, [videos]);
+  }, [videos, currentIndex]);
 
   const scrollToIndex = (index: number) => {
     if (containerRef.current) {
@@ -142,7 +144,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     if (videos.length > 0) {
       videoRefs.current.forEach((video, index) => {
         if (video) {
-          if (index === currentIndex) {
+          if (index === currentIndex && isActive) {
             // Reset mute state for new video if needed, or persist user preference.
             // For now, let's persist the 'isMuted' state across videos if we want, 
             // OR reset it. Usually feeds persist mute state. 
@@ -178,12 +180,22 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             }
           } else {
             video.pause();
-            video.currentTime = 0;
+            video.currentTime = 0; // Reset to start when scrolled away
+            if (index === currentIndex) {
+              setIsPlaying(false);
+            }
           }
         }
       });
     }
-  }, [currentIndex, videos]);
+
+    // Cleanup: pause all videos when unmounting or becoming inactive
+    return () => {
+      videoRefs.current.forEach(video => {
+        if (video) video.pause();
+      });
+    };
+  }, [currentIndex, videos, isActive]);
 
   const incrementView = async (videoId: string) => {
     if (!user) return;
@@ -253,15 +265,17 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         .from('skill_videos')
         .select(`
           *,
-          public_profiles!skill_videos_provider_id_fkey (
+          public_profiles:profiles!skill_videos_provider_id_fkey (
             full_name,
             avatar_url,
-            location
+            location,
+            is_verified
           ),
           skill_categories (
             name
           )
         `)
+        .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
       if (categoryFilter) {
@@ -302,7 +316,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               public_profiles!skill_videos_provider_id_fkey (
                 full_name,
                 avatar_url,
-                location
+                location,
+                is_verified
               ),
               skill_categories (
                 name
@@ -500,13 +515,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
     try {
       // Get current counts first
       const { data: providerProfile } = await supabase
-        .from('public_profiles')
+        .from('profiles')
         .select('followers_count')
         .eq('id', video.provider_id)
         .single();
 
       const { data: userProfile } = await supabase
-        .from('public_profiles')
+        .from('profiles')
         .select('following_count')
         .eq('id', user.id)
         .single();
@@ -664,7 +679,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
               >
                 <Heart
-                  className={`w-8 h-8 ${video.user_liked ? 'fill-red-500 text-red-500' : 'text-white'}`}
+                  className={`w-8 h-8 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
                 />
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">{video.likes_count}</span>
@@ -720,7 +735,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                         className="w-12 h-12 rounded-full border-2 border-white shadow-md object-cover"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 border-2 border-white flex items-center justify-center shadow-md">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-secondary-orange to-secondary-cyan border-2 border-white flex items-center justify-center shadow-md">
                         <span className="text-lg font-bold text-white">
                           {video.public_profiles?.full_name.charAt(0)}
                         </span>
@@ -733,7 +748,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                           e.stopPropagation();
                           handleFollow(video);
                         }}
-                        className="absolute -top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white rounded-full p-0.5 shadow-sm hover:scale-110 transition-transform"
+                        className="absolute -top-2 left-1/2 -translate-x-1/2 bg-secondary-orange text-white rounded-full p-0.5 shadow-sm hover:scale-110 transition-transform"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -742,12 +757,15 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2">
+                      <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2 flex items-center gap-1">
                         {video.public_profiles?.full_name}
+                        {video.public_profiles?.is_verified && (
+                          <BadgeCheck className="w-5 h-5 text-secondary-cyan fill-white drop-shadow-md" />
+                        )}
                       </h3>
                       {(video.average_rating || 0) > 0 && (
                         <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                          <Star className="w-3 h-3 fill-secondary-yellow text-secondary-yellow" />
                           <span className="font-bold text-xs">{(video.average_rating || 0).toFixed(1)}</span>
                         </div>
                       )}
@@ -769,7 +787,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 <div className="mb-4">
                   <h4 className="font-bold text-base mb-1 drop-shadow-md">{video.title}</h4>
                   {video.description && (
-                    <div>
+                    <>
                       <p
                         className={`text-sm text-gray-100 drop-shadow-sm max-w-prose transition-all duration-200 ${expandedDescriptions.has(video.id) ? '' : 'line-clamp-2'
                           }`}
@@ -795,11 +813,9 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                           {expandedDescriptions.has(video.id) ? 'Show less' : 'more'}
                         </button>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
-
-
               </div>
             </div>
           </div>
