@@ -3,6 +3,7 @@ import { X, Loader2, Camera, User, Lock, Eye, Shield, Trash2, LogOut, Settings, 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { ProfileCompletionMeter } from './ProfileCompletionMeter';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -30,6 +31,25 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [passLoading, setPassLoading] = useState(false);
+  const [totalVideos, setTotalVideos] = useState(0);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchStats();
+    }
+  }, [user?.id]);
+
+  const fetchStats = async () => {
+    try {
+      const { count } = await supabase
+        .from('skill_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('provider_id', user!.id);
+      setTotalVideos(count || 0);
+    } catch (e) {
+      console.warn('Error fetching stats for completion meter:', e);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -223,6 +243,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {/* Completion Meter */}
+            {activeTab === 'profile' && profile?.user_type === 'provider' && (
+              <ProfileCompletionMeter profile={profile} stats={{ totalVideos }} />
+            )}
 
             {activeTab === 'profile' ? (
               <form onSubmit={handleProfileUpdate} className="space-y-8">

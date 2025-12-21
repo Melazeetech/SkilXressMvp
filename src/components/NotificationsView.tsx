@@ -201,6 +201,30 @@ export function NotificationsView() {
                         </div>
                         <h3 className="text-lg font-medium text-gray-900 mb-1">No notifications</h3>
                         <p className="text-sm">We'll notify you when something happens.</p>
+
+                        {Notification.permission !== 'granted' && (
+                            <div className="mt-8 p-6 bg-gradient-to-br from-secondary-black to-slate-900 rounded-2xl text-white shadow-xl max-w-sm w-full">
+                                <Bell className="w-10 h-10 text-secondary-cyan mb-4 mx-auto" />
+                                <h4 className="font-bold text-lg mb-2">Enable Push Alerts</h4>
+                                <p className="text-xs text-blue-100/60 mb-6">
+                                    Get notified about new bookings and messages even when the app is closed.
+                                </p>
+                                <button
+                                    onClick={async () => {
+                                        const granted = await (await import('../lib/notificationService')).notificationService.requestPermission();
+                                        if (granted) {
+                                            toast.success('Notifications enabled!');
+                                            // Force a re-render
+                                            setLoading(true);
+                                            setTimeout(() => setLoading(false), 100);
+                                        }
+                                    }}
+                                    className="w-full bg-secondary-cyan text-secondary-black font-bold py-2.5 rounded-xl hover:brightness-110 transition-all border-none"
+                                >
+                                    Enable Now
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     notifications.map((notification) => (

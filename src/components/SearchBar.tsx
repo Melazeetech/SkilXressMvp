@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Play, MapPin } from 'lucide-react';
+import { Search, X, Play, MapPin, BadgeCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 
@@ -8,6 +8,7 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
     full_name: string;
     avatar_url: string | null;
     location: string | null;
+    is_verified?: boolean;
   };
   skill_categories: {
     name: string;
@@ -42,7 +43,8 @@ export function SearchBar({ onSearch, onClose }: SearchBarProps) {
             profiles!skill_videos_provider_id_fkey (
               full_name,
               avatar_url,
-              location
+              location,
+              is_verified
             ),
             skill_categories (
               name
@@ -149,7 +151,12 @@ export function SearchBar({ onSearch, onClose }: SearchBarProps) {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-gray-900 truncate">{video.title}</h4>
+                    <div className="flex items-center gap-1">
+                      <h4 className="font-semibold text-gray-900 truncate">{video.title}</h4>
+                      {video.profiles?.is_verified && (
+                        <BadgeCheck className="w-4 h-4 text-secondary-cyan fill-white flex-shrink-0" />
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 truncate">{video.description}</p>
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                       <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">

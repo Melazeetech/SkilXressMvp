@@ -47,6 +47,7 @@ export interface Database {
           updated_at?: string
           status?: string
           is_public?: boolean
+          is_verified?: boolean
         }
         Update: {
           id?: string
@@ -65,6 +66,7 @@ export interface Database {
           updated_at?: string
           status?: string
           is_public?: boolean
+          is_verified?: boolean
         }
       }
       public_profiles: {
@@ -419,6 +421,87 @@ export interface Database {
           created_at?: string
         }
       }
+      video_comments: {
+        Row: {
+          id: string
+          video_id: string
+          user_id: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          video_id: string
+          user_id: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          video_id?: string
+          user_id?: string
+          content?: string
+          created_at?: string
+        }
+      }
+      video_moderation: {
+        Row: {
+          id: string
+          video_id: string
+          status: 'pending' | 'approved' | 'rejected'
+          moderated_by: string | null
+          moderated_at: string
+          moderation_reason: string | null
+        }
+        Insert: {
+          id?: string
+          video_id: string
+          status: 'pending' | 'approved' | 'rejected'
+          moderated_by?: string | null
+          moderated_at?: string
+          moderation_reason?: string | null
+        }
+        Update: {
+          id?: string
+          video_id?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          moderated_by?: string | null
+          moderated_at?: string
+          moderation_reason?: string | null
+        }
+      }
+      video_views: {
+        Row: {
+          id: string
+          video_id: string
+          user_id: string | null
+          viewed_at: string
+        }
+        Insert: {
+          id?: string
+          video_id: string
+          user_id?: string | null
+          viewed_at?: string
+        }
+        Update: {
+          id?: string
+          video_id?: string
+          user_id?: string | null
+          viewed_at?: string
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

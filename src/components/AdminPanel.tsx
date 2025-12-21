@@ -10,6 +10,8 @@ type SkillVideo = Database['public']['Tables']['skill_videos']['Row'] & {
     public_profiles: {
         full_name: string;
         avatar_url: string | null;
+        is_verified?: boolean;
+        location?: string | null;
     };
 };
 
@@ -98,37 +100,73 @@ export function AdminPanel() {
 
     const updateVideoStatus = async (videoId: string, status: 'approved' | 'rejected') => {
         try {
-            const { error } = await supabase
+            console.log(`AdminPanel: Attempting to update video ${videoId} status to ${status}...`);
+
+            // 1. Update the video status in skill_videos table
+            // @ts-ignore
+            const { data: updatedData, error: updateError } = await supabase
                 .from('skill_videos')
-                // @ts-ignore
-                .update({ status })
-                .eq('id', videoId);
+                .update({ status: status } as any) // Use 'as any' if type gen is strictly following old schema
+                .eq('id', videoId)
+                .select();
 
-            if (error) throw error;
-
-            // Trigger notification
-            const video = videos.find(v => v.id === videoId);
-            if (video) {
-                // @ts-ignore
-                await supabase.from('notifications').insert({
-                    user_id: video.provider_id,
-                    type: 'video_approval',
-                    title: status === 'approved' ? 'Video Approved! 🎥' : 'Video Update',
-                    message: status === 'approved'
-                        ? `Your video "${video.title}" has been approved and is now live!`
-                        : `Your video "${video.title}" was not approved at this time.`,
-                    data: { video_id: videoId, status }
-                });
+            if (updateError) {
+                console.error('AdminPanel: Supabase update error:', updateError);
+                throw updateError;
             }
 
+            if (!updatedData || updatedData.length === 0) {
+                console.warn('AdminPanel: Update succeeded but no rows were affected. This is likely an RLS permission issue.');
+                toast.error('Update failed: Permission denied or video not found');
+                return;
+            }
+
+            console.log('AdminPanel: Successfully updated video in DB:', updatedData[0]);
+
+            // 2. Also update or create a record in the video_moderation history table
+            try {
+                const { error: modError } = await supabase
+                    .from('video_moderation')
+                    .upsert({
+                        video_id: videoId,
+                        status: status,
+                        moderated_at: new Date().toISOString(),
+                        moderated_by: 'Admin Panel',
+                        moderation_reason: 'Manual review by administrator'
+                    } as any);
+                if (modError) console.warn('AdminPanel: Failed to update moderation history:', modError);
+            } catch (e) {
+                console.warn('AdminPanel: Moderation history update error:', e);
+            }
+
+            // 3. Update local state
             setVideos(prev => prev.map(v =>
                 v.id === videoId ? { ...v, status } : v
             ));
 
+            // 4. Send notification to provider
+            try {
+                const video = videos.find(v => v.id === videoId);
+                if (video) {
+                    console.log(`AdminPanel: Sending notification to provider ${video.provider_id}...`);
+                    await supabase.from('notifications').insert({
+                        user_id: video.provider_id,
+                        type: 'video_approval',
+                        title: status === 'approved' ? 'Video Approved! 🎥' : 'Video Update',
+                        message: status === 'approved'
+                            ? `Your video "${video.title}" has been approved and is now live!`
+                            : `Your video "${video.title}" was not approved at this time.`,
+                        data: { video_id: videoId, status }
+                    } as any);
+                }
+            } catch (notificationError) {
+                console.warn('AdminPanel: Background notification failed:', notificationError);
+            }
+
             toast.success(`Video ${status.charAt(0).toUpperCase() + status.slice(1)}`);
         } catch (error) {
             console.error('Error updating video status:', error);
-            toast.error('Action failed');
+            toast.error('Action failed. Check your admin permissions.');
         }
     };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MapPin, Star, Loader2, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck } from 'lucide-react';
+import { MessageSquare, Heart, MapPin, Star, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,8 @@ import { HeartOverlay } from './HeartOverlay';
 import { ReviewsSheet } from './ReviewsSheet';
 import { useBackHandler } from '../hooks/useBackHandler';
 import { VideoViewsModal } from './VideoViewsModal';
+import { VideoCommentsSheet } from './VideoCommentsSheet';
+import { VideoSkeleton } from './Skeleton';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   public_profiles: {
@@ -55,8 +57,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const containerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
   const { user } = useAuth();
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
+  useBackHandler(commentsOpen, () => setCommentsOpen(false), 'comments-sheet');
 
   useEffect(() => {
     loadVideos();
@@ -324,12 +328,15 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               )
             `)
             .eq('id', sharedVideoId)
+            .eq('status', 'approved')
             .maybeSingle();
 
           if (specificError) {
             console.error('VideoFeed: Error fetching shared video', specificError);
           } else if (specificVideo) {
             data = [specificVideo, ...(data || [])];
+          } else {
+            console.warn('VideoFeed: Shared video not found or not approved.');
           }
         }
       }
@@ -387,8 +394,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         )
         : validVideos;
 
-      console.log('VideoFeed: Final filtered videos count:', filteredVideos.length);
-      setVideos(filteredVideos);
+      // Final safety check: Only show approved videos
+      const finalVideos = filteredVideos.filter((v: any) => v.status === 'approved');
+
+      console.log('VideoFeed: Final approved videos count:', finalVideos.length);
+      // Diagnostic log
+      finalVideos.forEach((v: any) => console.log(`Live Video: "${v.title}" | Status: ${v.status}`));
+
+      setVideos(finalVideos);
     } catch (error: any) {
       console.error('Error loading videos:', error);
       setError(error.message || 'Failed to load videos');
@@ -565,8 +578,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="h-screen w-screen overflow-hidden bg-black">
+        <VideoSkeleton />
       </div>
     );
   }
@@ -659,27 +672,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none" />
 
           {/* Right Side Actions */}
-          <div className="absolute bottom-20 right-4 flex flex-col items-center gap-6 z-20">
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setVideoForViews(video);
-                  setViewsModalOpen(true);
-                }}
-                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
-              >
-                <Eye className="w-8 h-8 text-white" />
-              </button>
-              <span className="text-white text-xs font-medium drop-shadow-md">{video.views_count || 0}</span>
-            </div>
-
+          <div className="absolute top-1/2 -translate-y-[40%] right-4 flex flex-col items-center gap-5 z-20">
             <div className="flex flex-col items-center gap-1">
               <button
                 onClick={() => handleLike(video)}
-                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
               >
                 <Heart
-                  className={`w-8 h-8 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
+                  className={`w-7 h-7 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
                 />
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">{video.likes_count}</span>
@@ -689,13 +689,39 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               <button
                 onClick={() => {
                   setSelectedVideo(video);
+                  setCommentsOpen(true);
+                }}
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
+              >
+                <MessageSquare className="w-7 h-7 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">Comments</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setSelectedVideo(video);
                   setReviewsOpen(true);
                 }}
-                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
               >
-                <MessageCircle className="w-8 h-8 text-white" />
+                <MessageCircle className="w-7 h-7 text-white" />
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">Reviews</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setVideoForViews(video);
+                  setViewsModalOpen(true);
+                }}
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
+              >
+                <Eye className="w-7 h-7 text-white" />
+              </button>
+              <span className="text-white text-xs font-medium drop-shadow-md">{video.views_count || 0}</span>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -704,9 +730,9 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                   setSelectedVideo(video);
                   setShareModalOpen(true);
                 }}
-                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
               >
-                <Share2 className="w-8 h-8 text-white" />
+                <Share2 className="w-7 h-7 text-white" />
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">Share</span>
             </div>
@@ -714,9 +740,9 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             <div className="flex flex-col items-center gap-1">
               <button
                 onClick={() => onBookClick(video)}
-                className="p-3 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
               >
-                <Calendar className="w-8 h-8 text-white" />
+                <Calendar className="w-7 h-7 text-white" />
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">Book</span>
             </div>
@@ -823,39 +849,33 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       ))}
 
       {selectedVideo && (
-        <ShareModal
-          isOpen={shareModalOpen}
-          onClose={() => {
-            setShareModalOpen(false);
-            setSelectedVideo(null);
-          }}
-          videoId={selectedVideo.id}
-          videoTitle={selectedVideo.title}
-        />
-      )}
-
-      {selectedVideo && (
-        <ReviewsSheet
-          isOpen={reviewsOpen}
-          onClose={() => setReviewsOpen(false)}
-          providerId={selectedVideo.provider_id}
-        />
-      )}
-
-      {videoForViews && (
-        <VideoViewsModal
-          isOpen={viewsModalOpen}
-          onClose={() => {
-            setViewsModalOpen(false);
-            setVideoForViews(null);
-          }}
-          videoId={videoForViews.id}
-          onProfileClick={(userId) => {
-            setViewsModalOpen(false);
-            setVideoForViews(null);
-            onProviderClick?.(userId);
-          }}
-        />
+        <>
+          <VideoCommentsSheet
+            isOpen={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+            videoId={selectedVideo.id}
+          />
+          <ReviewsSheet
+            isOpen={reviewsOpen}
+            onClose={() => setReviewsOpen(false)}
+            providerId={selectedVideo.provider_id}
+          />
+          <ShareModal
+            isOpen={shareModalOpen}
+            onClose={() => setShareModalOpen(false)}
+            videoId={selectedVideo.id}
+            videoTitle={selectedVideo.title}
+          />
+          <VideoViewsModal
+            isOpen={viewsModalOpen}
+            onClose={() => setViewsModalOpen(false)}
+            videoId={videoForViews?.id || ''}
+            onProfileClick={(userId) => {
+              setViewsModalOpen(false);
+              onProviderClick?.(userId);
+            }}
+          />
+        </>
       )}
     </div>
   );

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Plus, Video, Calendar, CheckCircle, X, Loader2, MessageCircle, Star, Briefcase } from 'lucide-react';
+import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
 import { PortfolioManager } from './PortfolioManager';
 import { ProviderStatsHeader } from './ProviderStatsHeader';
+import { ProfileCompletionMeter } from './ProfileCompletionMeter';
+import { Skeleton } from './Skeleton';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   client_profile: {
@@ -197,9 +199,9 @@ export function ProviderDashboard() {
         <div className="flex gap-4 mb-6 overflow-x-auto pb-2">
           <button
             onClick={() => setActiveTab('videos')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'videos'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'videos'
+              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
+              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
               }`}
           >
             <Video className="w-5 h-5" />
@@ -207,9 +209,9 @@ export function ProviderDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'bookings'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'bookings'
+              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
+              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
               }`}
           >
             <Calendar className="w-5 h-5" />
@@ -217,9 +219,9 @@ export function ProviderDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'reviews'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'reviews'
+              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
+              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
               }`}
           >
             <Star className="w-5 h-5" />
@@ -227,9 +229,9 @@ export function ProviderDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('portfolio')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${activeTab === 'portfolio'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'portfolio'
+              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
+              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
               }`}
           >
             <Briefcase className="w-5 h-5" />
@@ -240,9 +242,28 @@ export function ProviderDashboard() {
         {/* Provider Stats Header */}
         <ProviderStatsHeader profile={profile} stats={stats} />
 
+        {/* Profile Completion Meter */}
+        {profile?.user_type === 'provider' && (
+          <ProfileCompletionMeter profile={profile} stats={stats} />
+        )}
+
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-secondary-black/5 animate-pulse">
+                  <Skeleton variant="rectangle" className="w-full h-48 rounded-none" />
+                  <div className="p-4 space-y-3">
+                    <Skeleton variant="text" className="w-3/4 h-5" />
+                    <Skeleton variant="text" className="w-1/2 h-3" />
+                    <div className="flex justify-between">
+                      <Skeleton variant="text" className="w-16 h-3" />
+                      <Skeleton variant="text" className="w-16 h-3" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <>
@@ -705,7 +726,7 @@ function VideoUploadForm({
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               'Upload Video'
             )}

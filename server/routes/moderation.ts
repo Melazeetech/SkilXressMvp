@@ -112,6 +112,7 @@ router.post('/upload', async (req: Request, res: Response) => {
                 description: description || '',
                 category_id: categoryId,
                 video_url: videoURL,
+                status: 'pending',
                 moderation_status: 'pending',
                 likes_count: 0,
                 views_count: 0

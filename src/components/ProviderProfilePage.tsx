@@ -156,12 +156,11 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                 }
 
                 const { data: newBooking, error } = await supabase
-                    .from('bookings')
+                    .from('bookings' as any)
                     .insert({
-                        // @ts-ignore
                         client_id: user.id,
                         provider_id: providerId,
-                        category_id: videos[0]?.category_id,
+                        category_id: videos[0].category_id,
                         status: 'pending',
                         preferred_date: new Date().toISOString().split('T')[0],
                         preferred_time: '12:00 PM',
@@ -301,7 +300,7 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
                             <FollowButton
                                 providerId={providerId}
                                 initialFollowersCount={provider.followers_count || 0}
-                                onFollowChange={(isFollowing, newCount) => {
+                                onFollowChange={(_isFollowing, newCount) => {
                                     setProvider(prev => prev ? { ...prev, followers_count: newCount } : null);
                                 }}
                                 onAuthRequired={onAuthRequired}

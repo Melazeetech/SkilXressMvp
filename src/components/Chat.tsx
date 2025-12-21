@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Loader2, ArrowLeft, Paperclip, Mic, X, FileText, Image as ImageIcon, StopCircle } from 'lucide-react';
+import { Send, ArrowLeft, Paperclip, Mic, X, FileText, Image as ImageIcon, StopCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
@@ -34,6 +34,9 @@ export function Chat({ booking, onClose }: ChatProps) {
   const [recording, setRecording] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [remoteTyping, setRemoteTyping] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -107,11 +110,47 @@ export function Chat({ booking, onClose }: ChatProps) {
           }
         }
       )
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload.userId !== user?.id) {
+          setRemoteTyping(payload.isTyping);
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const handleTyping = (value: string) => {
+    setNewMessage(value);
+
+    if (!user || !booking) return;
+
+    // Send typing broadcast
+    const channel = supabase.channel(`booking-${booking.id}`);
+
+    if (typingTimeout) clearTimeout(typingTimeout);
+
+    if (!isTyping) {
+      setIsTyping(true);
+      channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: user.id, isTyping: true },
+      });
+    }
+
+    const timeout = setTimeout(() => {
+      setIsTyping(false);
+      channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: user.id, isTyping: false },
+      });
+    }, 2000);
+
+    setTypingTimeout(timeout);
   };
 
 
@@ -251,10 +290,10 @@ export function Chat({ booking, onClose }: ChatProps) {
   if (!otherUser) return null;
 
   return (
-    <div className="fixed inset-0 bg-white z-50 flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
-        <button onClick={onClose} className="mr-3 p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col">
+      <div className="bg-white/80 backdrop-blur-lg border-b border-gray-100 px-6 py-4 flex items-center sticky top-0 z-10">
+        <button onClick={onClose} className="mr-4 p-2.5 hover:bg-gray-100 rounded-xl transition-all active:scale-95">
+          <ArrowLeft className="w-6 h-6 text-gray-700" />
         </button>
         <div className="flex items-center flex-1">
           {otherUser.avatar_url ? (
@@ -271,16 +310,16 @@ export function Chat({ booking, onClose }: ChatProps) {
             </div>
           )}
           <div>
-            <h3 className="font-semibold">{otherUser.full_name}</h3>
-            <p className="text-xs text-gray-500">{booking.skill_categories.name}</p>
+            <h3 className="font-bold text-gray-900">{otherUser.full_name}</h3>
+            <p className="text-xs font-semibold text-secondary-cyan uppercase tracking-wider">{booking.skill_categories.name}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f8fafc] scroll-smooth">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <div className="w-8 h-8 border-4 border-secondary-cyan/20 border-t-secondary-cyan rounded-full animate-spin" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-400">
@@ -341,6 +380,15 @@ export function Chat({ booking, onClose }: ChatProps) {
               </div>
             );
           })
+        )}
+        {remoteTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border border-gray-100 flex items-center gap-1">
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" />
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+              <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+            </div>
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -412,18 +460,18 @@ export function Chat({ booking, onClose }: ChatProps) {
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(e) => handleTyping(e.target.value)}
             placeholder={recording ? "Recording..." : "Type a message..."}
             disabled={recording}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 disabled:bg-gray-100"
+            className="flex-1 px-5 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-secondary-cyan/50 bg-gray-50 disabled:bg-gray-100 text-sm font-medium transition-all"
           />
           <button
             type="submit"
             disabled={(!newMessage.trim() && !selectedFile) || sending || recording || uploading}
-            className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            className="bg-secondary-cyan text-white p-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-secondary-cyan/20"
           >
             {sending || uploading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <Send className="w-5 h-5" />
             )}

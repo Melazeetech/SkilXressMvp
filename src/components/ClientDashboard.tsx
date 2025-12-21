@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Calendar, MessageCircle, Star, Loader2 } from 'lucide-react';
+import { Calendar, MessageCircle, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
 import { ClientStatsHeader } from './ClientStatsHeader';
+import { DashboardCardSkeleton } from './Skeleton';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   provider_profile: {
@@ -133,8 +134,14 @@ export function ClientDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="h-40 bg-white rounded-2xl mb-8 animate-pulse" /> {/* Header skeleton */}
+          <div className="h-8 w-48 bg-gray-200 rounded mb-6 animate-pulse" />
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => <DashboardCardSkeleton key={i} />)}
+          </div>
+        </div>
       </div>
     );
   }

@@ -134,6 +134,16 @@ export function VideoManager() {
                                     <Play className="w-5 h-5 text-white fill-current ml-1" />
                                 </div>
                             </div>
+
+                            {/* Status Badge */}
+                            <div className="absolute bottom-2 right-2">
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm ${video.status === 'approved' ? 'bg-green-500 text-white' :
+                                        video.status === 'rejected' ? 'bg-red-500 text-white' :
+                                            'bg-yellow-500 text-white'
+                                    }`}>
+                                    {video.status || 'pending'}
+                                </span>
+                            </div>
                         </div>
 
                         <div className="p-4">
@@ -238,6 +248,8 @@ function VideoUploadForm({
                 video_url: finalVideoUrl,
                 title,
                 description: description || null,
+                status: 'pending',
+                moderation_status: 'pending'
             } as any);
 
             if (error) throw error;
