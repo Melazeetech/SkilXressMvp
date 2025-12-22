@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Loader2 } from 'lucide-react';
+import { User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
@@ -122,25 +122,27 @@ export function ConversationList({ onSelectBooking }: ConversationListProps) {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <div className="w-10 h-10 border-4 border-secondary-black/10 border-t-secondary-black rounded-full animate-spin" />
             </div>
         );
     }
 
     if (bookings.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                <div className="bg-gray-100 p-4 rounded-full mb-4">
-                    <User className="w-8 h-8 text-gray-400" />
+            <div className="flex flex-col items-center justify-center h-64 text-secondary-black/40 gap-4">
+                <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center">
+                    <User className="w-10 h-10 opacity-20" />
                 </div>
-                <p className="font-medium">No conversations yet</p>
-                <p className="text-sm mt-1">Book a service to start chatting!</p>
+                <div className="text-center">
+                    <p className="font-bold text-lg mb-1 text-secondary-black">No conversations yet</p>
+                    <p className="text-sm font-medium opacity-60">Book a service to start chatting!</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="divide-y divide-gray-100">
+        <div className="space-y-2 p-2">
             {bookings.map((booking) => {
                 const isClient = user?.id === booking.client_id;
                 const otherProfile = isClient ? booking.provider_profile : booking.client_profile;
@@ -151,7 +153,7 @@ export function ConversationList({ onSelectBooking }: ConversationListProps) {
                     <button
                         key={booking.id}
                         onClick={() => onSelectBooking(booking)}
-                        className={`w-full flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors text-left ${isUnread ? 'bg-blue-50/50' : ''
+                        className={`w-full flex items-center gap-4 p-4 hover:bg-white transition-all text-left rounded-3xl group ${isUnread ? 'bg-white shadow-sm ring-1 ring-secondary-orange/10' : 'hover:shadow-md bg-transparent'
                             }`}
                     >
                         {/* Avatar */}
@@ -160,26 +162,28 @@ export function ConversationList({ onSelectBooking }: ConversationListProps) {
                                 <img
                                     src={otherProfile.avatar_url}
                                     alt={otherProfile.full_name}
-                                    className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                                    className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md group-hover:scale-105 transition-transform duration-300"
                                 />
                             ) : (
-                                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200">
-                                    <User className="w-6 h-6 text-gray-400" />
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-secondary-orange to-secondary-cyan flex items-center justify-center border-2 border-white shadow-md group-hover:scale-105 transition-transform duration-300">
+                                    <span className="font-black text-white text-lg">
+                                        {otherProfile.full_name.charAt(0)}
+                                    </span>
                                 </div>
                             )}
                             {isUnread && (
-                                <div className="absolute top-0 right-0 w-3 h-3 bg-blue-600 rounded-full border-2 border-white" />
+                                <div className="absolute top-0 right-0 w-4 h-4 bg-secondary-orange rounded-full border-2 border-white ring-2 ring-secondary-orange/20 animate-pulse" />
                             )}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline mb-1">
-                                <h3 className={`font-semibold truncate ${isUnread ? 'text-gray-900' : 'text-gray-700'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <h3 className={`font-black truncate text-lg ${isUnread ? 'text-secondary-black' : 'text-secondary-black/80'}`}>
                                     {otherProfile.full_name}
                                 </h3>
                                 {lastMessage && (
-                                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                                    <span className="text-[10px] font-bold text-gray-400 flex-shrink-0 ml-2 uppercase tracking-wide">
                                         {new Date(lastMessage.created_at).toLocaleDateString(undefined, {
                                             month: 'short',
                                             day: 'numeric',
@@ -188,12 +192,12 @@ export function ConversationList({ onSelectBooking }: ConversationListProps) {
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 rounded-full text-gray-600">
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold px-2 py-0.5 bg-secondary-cyan/10 text-secondary-cyan rounded-full uppercase tracking-wider">
                                     {booking.skill_categories.name}
                                 </span>
-                                <p className={`text-sm truncate ${isUnread ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-                                    {lastMessage ? lastMessage.message : 'Start a conversation'}
+                                <p className={`text-sm truncate flex-1 ${isUnread ? 'font-bold text-secondary-black' : 'font-medium text-gray-400'}`}>
+                                    {lastMessage ? lastMessage.message : <span className="italic opacity-70">Start a conversation</span>}
                                 </p>
                             </div>
                         </div>

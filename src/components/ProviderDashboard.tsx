@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase } from 'lucide-react';
+import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
@@ -8,6 +8,7 @@ import { PortfolioManager } from './PortfolioManager';
 import { ProviderStatsHeader } from './ProviderStatsHeader';
 import { ProfileCompletionMeter } from './ProfileCompletionMeter';
 import { Skeleton } from './Skeleton';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   client_profile: {
@@ -38,7 +39,7 @@ type Rating = Database['public']['Tables']['ratings']['Row'] & {
   };
 };
 
-export function ProviderDashboard() {
+export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
   const [activeTab, setActiveTab] = useState<'videos' | 'bookings' | 'reviews' | 'portfolio'>('videos');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -60,6 +61,10 @@ export function ProviderDashboard() {
     loadData();
     loadStats();
   }, [activeTab]);
+
+  // Handle hardware back button for internal states
+  useBackHandler(showChat, () => setShowChat(false), 'provider-chat');
+  useBackHandler(showUploadForm, () => setShowUploadForm(false), 'video-upload');
 
   const loadStats = async () => {
     if (!user) return;
@@ -184,7 +189,18 @@ export function ProviderDashboard() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Provider Dashboard</h1>
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-600 md:hidden"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+            )}
+            <h1 className="text-2xl font-bold">Provider Dashboard</h1>
+          </div>
           {activeTab === 'videos' && (
             <button
               onClick={() => setShowUploadForm(true)}
@@ -483,16 +499,18 @@ export function ProviderDashboard() {
         )}
       </div>
 
-      {showUploadForm && (
-        <VideoUploadForm
-          categories={categories}
-          onClose={() => {
-            setShowUploadForm(false);
-            loadData();
-          }}
-        />
-      )}
-    </div>
+      {
+        showUploadForm && (
+          <VideoUploadForm
+            categories={categories}
+            onClose={() => {
+              setShowUploadForm(false);
+              loadData();
+            }}
+          />
+        )
+      }
+    </div >
   );
 }
 

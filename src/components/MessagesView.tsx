@@ -69,8 +69,8 @@ export function MessagesView({ activeBookingId }: { activeBookingId?: string | n
 
     return (
         <div className="max-w-2xl mx-auto bg-white min-h-[calc(100vh-3.5rem)]">
-            <div className="p-4 border-b border-gray-100 sticky top-14 bg-white z-10">
-                <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+            <div className="p-4 border-b border-gray-100 sticky top-14 bg-white/90 backdrop-blur-md z-10 transition-all">
+                <h1 className="text-3xl font-black text-secondary-black tracking-tight">Messages</h1>
             </div>
             <ConversationList onSelectBooking={setSelectedBooking} />
         </div>

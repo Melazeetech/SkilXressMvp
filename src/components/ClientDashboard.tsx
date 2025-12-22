@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Calendar, MessageCircle, Star } from 'lucide-react';
+import { Calendar, MessageCircle, Star, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { Chat } from './Chat';
 import { ClientStatsHeader } from './ClientStatsHeader';
 import { DashboardCardSkeleton } from './Skeleton';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   provider_profile: {
@@ -21,7 +22,7 @@ type Booking = Database['public']['Tables']['bookings']['Row'] & {
   };
 };
 
-export function ClientDashboard() {
+export function ClientDashboard({ onBack }: { onBack?: () => void }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -41,6 +42,10 @@ export function ClientDashboard() {
     loadBookings();
     loadStats();
   }, []);
+
+  // Handle hardware back button for internal states
+  useBackHandler(showChat, () => setShowChat(false), 'client-chat');
+  useBackHandler(!!ratingBooking, () => setRatingBooking(null), 'rating-form');
 
   const loadStats = async () => {
     if (!user) return;
@@ -156,7 +161,18 @@ export function ClientDashboard() {
         {/* Client Stats Header */}
         <ClientStatsHeader profile={profile} stats={stats} />
 
-        <h1 className="text-2xl font-bold mb-6">My Bookings</h1>
+        <div className="flex items-center gap-4 mb-6">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-600 md:hidden"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+          )}
+          <h1 className="text-2xl font-bold">My Bookings</h1>
+        </div>
 
         <div className="space-y-4">
           {bookings.length === 0 ? (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Home, User, LogOut, Menu, X, MessageSquare, Bell, Search, Shield } from 'lucide-react';
+import { Home, User, LogOut, Menu, X, MessageSquare, Bell, Search, Shield, ArrowLeft } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -39,6 +39,7 @@ type Video = Database['public']['Tables']['skill_videos']['Row'] & {
 function AppContent() {
   const { user, profile, signOut, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [isGuest, setIsGuest] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -66,7 +67,7 @@ function AppContent() {
     setProviderProfileOpen(false);
     setSelectedProviderId(null);
   }, 'provider-profile');
-  useBackHandler(currentView === 'dashboard' || currentView === 'messages' || currentView === 'notifications', () => {
+  useBackHandler(currentView === 'dashboard' || currentView === 'messages' || currentView === 'notifications' || currentView === 'admin', () => {
     setCurrentView('feed');
     setActiveBookingId(null);
   }, 'main-view');
@@ -151,6 +152,7 @@ function AppContent() {
 
   const handleBookClick = (video: Video) => {
     if (!user) {
+      setAuthMode('signin');
       setAuthModalOpen(true);
       return;
     }
@@ -179,6 +181,12 @@ function AppContent() {
         <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-secondary-black/80 backdrop-blur-lg border-b border-white/10 shadow-xl">
           <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleHomeClick}
+                className="p-2.5 hover:bg-white/10 rounded-xl text-white transition-all active:scale-90"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
               <button
                 onClick={handleHomeClick}
                 className="flex items-center gap-3 group px-3 py-1.5 rounded-xl hover:bg-white/5 transition-all"
@@ -298,7 +306,10 @@ function AppContent() {
                 </>
               ) : (
                 <button
-                  onClick={() => setAuthModalOpen(true)}
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setAuthModalOpen(true);
+                  }}
                   className="bg-primary text-secondary-black px-6 py-2 rounded-lg font-bold hover:bg-secondary-yellow transition-colors shadow-sm"
                 >
                   Sign In
@@ -312,6 +323,18 @@ function AppContent() {
       {currentView === 'feed' && (user || isGuest || sharedVideoId) && (
         <div className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
           <div className="flex items-center gap-3 pointer-events-auto">
+            {(isGuest || sharedVideoId) && (
+              <button
+                onClick={() => {
+                  setIsGuest(false);
+                  setSharedVideoId(null);
+                  setCurrentView('feed'); // This will trigger LandingPage if user is null
+                }}
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-2xl text-white hover:bg-black/40 transition-all shadow-lg active:scale-95 border border-white/10"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+            )}
             <button
               onClick={handleHomeClick}
               className="flex items-center gap-3 group px-4 py-2 rounded-2xl bg-black/20 backdrop-blur-md border border-white/10 hover:bg-black/30 transition-all shadow-lg pointer-events-auto"
@@ -437,6 +460,7 @@ function AppContent() {
                 ) : (
                   <button
                     onClick={() => {
+                      setAuthMode('signin');
                       setAuthModalOpen(true);
                       setMenuOpen(false);
                     }}
@@ -454,9 +478,9 @@ function AppContent() {
         </div>
       )}
 
-      <main className={`${currentView === 'feed' ? 'pt-0 h-[100dvh]' : 'pt-[72px] min-h-[calc(100vh-72px)] pb-20 sm:pb-0'}`}>
+      <main className={`${currentView === 'feed' && (user || isGuest || sharedVideoId) ? 'pt-0 h-[100dvh] overflow-hidden' : 'pt-[72px] min-h-[calc(100vh-72px)] pb-20 sm:pb-0'}`}>
         {currentView === 'admin' ? (
-          <AdminPanel />
+          <AdminPanel onBack={handleHomeClick} />
         ) : currentView === 'feed' ? (
           user || sharedVideoId || isGuest ? (
             <VideoFeed
@@ -468,14 +492,24 @@ function AppContent() {
                 setSelectedProviderId(providerId);
                 setProviderProfileOpen(true);
               }}
-              onAuthRequired={() => setAuthModalOpen(true)}
+              onAuthRequired={() => {
+                setAuthMode('signin');
+                setAuthModalOpen(true);
+              }}
               sharedVideoId={sharedVideoId}
               isActive={currentView === 'feed' && !menuOpen && !profileModalOpen && !authModalOpen && !bookingModalOpen && !providerProfileOpen && !searchModalOpen}
             />
           ) : (
             <LandingPage
-              onGetStarted={() => setAuthModalOpen(true)}
-              onBrowse={() => setIsGuest(true)}
+              onGetStarted={() => {
+                setAuthMode('signin');
+                setAuthModalOpen(true);
+              }}
+              onBrowse={(catId) => {
+                if (catId) setCategoryFilter(catId);
+                setIsGuest(true);
+              }}
+              onShowPrivacy={() => setPrivacyOpen(true)}
             />
           )
         ) : currentView === 'messages' ? (
@@ -483,11 +517,15 @@ function AppContent() {
         ) : currentView === 'notifications' ? (
           <NotificationsView />
         ) : (
-          profile?.user_type === 'provider' ? <ProviderDashboard /> : <ClientDashboard />
+          profile?.user_type === 'provider' ? <ProviderDashboard onBack={handleHomeClick} /> : <ClientDashboard onBack={handleHomeClick} />
         )}
       </main>
 
-      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authMode}
+      />
       <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
       <PrivacyPolicy isOpen={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       <BookingModal
@@ -519,7 +557,10 @@ function AppContent() {
             setActiveBookingId(bookingId);
             setCurrentView('messages');
           }}
-          onAuthRequired={() => setAuthModalOpen(true)}
+          onAuthRequired={() => {
+            setAuthMode('signin');
+            setAuthModalOpen(true);
+          }}
         />
       )}
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -15,7 +15,7 @@ type SkillVideo = Database['public']['Tables']['skill_videos']['Row'] & {
     };
 };
 
-export function AdminPanel() {
+export function AdminPanel({ onBack }: { onBack?: () => void }) {
     const [activeTab, setActiveTab] = useState<'providers' | 'videos'>('providers');
     const [providers, setProviders] = useState<Profile[]>([]);
     const [videos, setVideos] = useState<SkillVideo[]>([]);
@@ -191,18 +191,29 @@ export function AdminPanel() {
         <div className="min-h-screen bg-primary font-balthazar pt-20 pb-12 px-4 sm:px-6">
             <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-secondary-black flex items-center gap-3">
-                            Admin Control Panel
-                            <span className="text-sm font-normal bg-secondary-cyan/10 text-secondary-cyan px-3 py-1 rounded-full border border-secondary-cyan/20">
-                                {activeTab === 'providers' ? 'Verification Hub' : 'Video Moderation'}
-                            </span>
-                        </h1>
-                        <p className="text-secondary-black/60 mt-1">
-                            {activeTab === 'providers'
-                                ? 'Manage and verify service providers on the platform.'
-                                : 'Review and approve uploaded skill videos.'}
-                        </p>
+                    <div className="flex items-center gap-4">
+                        {onBack && (
+                            <button
+                                onClick={onBack}
+                                className="p-2 hover:bg-white/10 rounded-xl transition-all active:scale-95 text-secondary-black md:hidden"
+                                aria-label="Go back"
+                            >
+                                <ArrowLeft className="w-6 h-6" />
+                            </button>
+                        )}
+                        <div>
+                            <h1 className="text-3xl font-bold text-secondary-black flex items-center gap-3">
+                                Admin Control Panel
+                                <span className="text-sm font-normal bg-secondary-cyan/10 text-secondary-cyan px-3 py-1 rounded-full border border-secondary-cyan/20">
+                                    {activeTab === 'providers' ? 'Verification Hub' : 'Video Moderation'}
+                                </span>
+                            </h1>
+                            <p className="text-secondary-black/60 mt-1">
+                                {activeTab === 'providers'
+                                    ? 'Manage and verify service providers on the platform.'
+                                    : 'Review and approve uploaded skill videos.'}
+                            </p>
+                        </div>
                     </div>
                     <button
                         onClick={activeTab === 'providers' ? loadProviders : loadVideos}

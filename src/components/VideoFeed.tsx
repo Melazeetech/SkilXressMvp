@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Heart, MapPin, Star, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck } from 'lucide-react';
+import { MessageSquare, Heart, MapPin, Star, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck, MoreVertical, Flag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,6 +58,12 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const initialScrollDone = useRef(false);
   const { user } = useAuth();
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+  const [videoForOptions, setVideoForOptions] = useState<Video | null>(null);
+
+  useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
+  useBackHandler(commentsOpen, () => setCommentsOpen(false), 'comments-sheet');
+  useBackHandler(optionsMenuOpen, () => setOptionsMenuOpen(false), 'options-menu');
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
   useBackHandler(commentsOpen, () => setCommentsOpen(false), 'comments-sheet');
@@ -230,6 +236,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   };
 
   const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
+    // If options menu is open, close it and resume actions?
+    // User said: "hide when i click the other part of the scrren and continue playing the video i was watching"
+    // So if menu is open, just close it.
+    if (optionsMenuOpen) {
+      setOptionsMenuOpen(false);
+      return;
+    }
+
     const video = e.currentTarget;
 
     // Clear any existing timeout (handling double click case)
@@ -241,6 +255,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
     // Set a new timeout to delay the single click action
     clickTimeoutRef.current = setTimeout(() => {
+      // Toggle play/pause only if menu wasn't just closed (handled by early return above)
       if (video.paused) {
         video.play();
         setIsPlaying(true);
@@ -317,7 +332,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             .from('skill_videos')
             .select(`
               *,
-              public_profiles!skill_videos_provider_id_fkey (
+              public_profiles:profiles!skill_videos_provider_id_fkey (
                 full_name,
                 avatar_url,
                 location,
@@ -365,6 +380,20 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             ? (ratingsData as any[]).reduce((sum, r) => sum + r.rating, 0) / ratingsData.length
             : 0;
 
+          // Fallback: If public_profiles is missing (due to RLS on 'profiles'), fetch from 'public_profiles' view
+          let publicProfile = video.public_profiles;
+          if (!publicProfile && video.provider_id) {
+            const { data: profileData } = await supabase
+              .from('public_profiles')
+              .select('full_name, avatar_url, location, is_verified')
+              .eq('id', video.provider_id)
+              .maybeSingle();
+
+            if (profileData) {
+              publicProfile = profileData;
+            }
+          }
+
           let isFollowing = false;
           if (user) {
             const { data: followData } = await supabase
@@ -378,6 +407,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
           return {
             ...video,
+            public_profiles: publicProfile,
             user_liked: userLiked,
             average_rating: averageRating,
             is_following: isFollowing,
@@ -746,6 +776,20 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               </button>
               <span className="text-white text-xs font-medium drop-shadow-md">Book</span>
             </div>
+
+            {/* More Options Button */}
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setVideoForOptions(video);
+                  setOptionsMenuOpen(true);
+                }}
+                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
+              >
+                <MoreVertical className="w-7 h-7 text-white" />
+              </button>
+            </div>
           </div>
 
           {/* Bottom Info Section */}
@@ -875,6 +919,33 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               onProviderClick?.(userId);
             }}
           />
+        </>
+      )}
+
+      {/* Side Options Menu */}
+      {optionsMenuOpen && videoForOptions && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOptionsMenuOpen(false);
+            }}
+          />
+          <div className="absolute top-0 right-0 bottom-0 w-64 bg-black/80 backdrop-blur-xl border-l border-white/10 p-6 z-50 animate-in slide-in-from-right duration-300">
+            <h3 className="text-white font-bold text-lg mb-6">Options</h3>
+            <div className="space-y-4">
+              <button className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors">
+                <Flag className="w-5 h-5" />
+                <span className="font-medium">Report Video</span>
+              </button>
+              <button className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-medium">Not Interested</span>
+              </button>
+              {/* Add more options as needed */}
+            </div>
+          </div>
         </>
       )}
     </div>

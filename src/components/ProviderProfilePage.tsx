@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical, CheckCircle } from 'lucide-react';
+import { MapPin, Star, Video as VideoIcon, Briefcase, MessageCircle, Loader2, MoreVertical, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { FollowButton } from './FollowButton';
@@ -216,11 +216,9 @@ export function ProviderProfilePage({ providerId, onClose, onBookClick, onMessag
             <div className="sticky top-0 bg-white/95 backdrop-blur-sm z-20 border-b px-4 py-3 flex items-center gap-4">
                 <button
                     onClick={onClose}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors active:scale-95"
                 >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+                    <ArrowLeft className="w-6 h-6 text-gray-700" />
                 </button>
                 <h2 className="font-semibold text-lg truncate">{provider.full_name}</h2>
             </div>
