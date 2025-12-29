@@ -103,7 +103,6 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view all profiles"
   ON profiles FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "Users can update own profile"
@@ -129,7 +128,6 @@ ALTER TABLE skill_categories ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view skill categories"
   ON skill_categories FOR SELECT
-  TO authenticated
   USING (true);
 
 -- Insert default categories
@@ -160,7 +158,6 @@ ALTER TABLE provider_skills ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view provider skills"
   ON provider_skills FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "Providers can manage own skills"
@@ -188,7 +185,6 @@ ALTER TABLE skill_videos ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view videos"
   ON skill_videos FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "Providers can manage own videos"
@@ -210,7 +206,6 @@ ALTER TABLE video_likes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Anyone can view likes"
   ON video_likes FOR SELECT
-  TO authenticated
   USING (true);
 
 CREATE POLICY "Users can manage own likes"

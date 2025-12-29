@@ -871,7 +871,7 @@ export function LandingPage({ onGetStarted, onBrowse, onShowPrivacy }: LandingPa
                     </div>
                     <div className="pt-8 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
                         <p className="text-secondary-black/40 text-sm font-bold">
-                            © 2024 SKILXPRESS PRO CONNECT. ALL RIGHTS RESERVED.
+                            © 2025 SKILXPRESS PRO CONNECT. ALL RIGHTS RESERVED.
                         </p>
                         <div className="flex gap-8">
                             <button className="text-sm font-black uppercase tracking-widest hover:text-secondary-orange transition-all">Instagram</button>

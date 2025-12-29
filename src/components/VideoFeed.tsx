@@ -49,7 +49,6 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [processingLikes, setProcessingLikes] = useState<Set<string>>(new Set());
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [viewsModalOpen, setViewsModalOpen] = useState(false);
-  const [videoForViews, setVideoForViews] = useState<Video | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
@@ -61,12 +60,19 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
   const [videoForOptions, setVideoForOptions] = useState<Video | null>(null);
 
-  useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
-  useBackHandler(commentsOpen, () => setCommentsOpen(false), 'comments-sheet');
-  useBackHandler(optionsMenuOpen, () => setOptionsMenuOpen(false), 'options-menu');
+  const closeAllModals = () => {
+    setCommentsOpen(false);
+    setReviewsOpen(false);
+    setViewsModalOpen(false);
+    setShareModalOpen(false);
+    setOptionsMenuOpen(false);
+  };
 
   useBackHandler(reviewsOpen, () => setReviewsOpen(false), 'reviews-sheet');
   useBackHandler(commentsOpen, () => setCommentsOpen(false), 'comments-sheet');
+  useBackHandler(optionsMenuOpen, () => setOptionsMenuOpen(false), 'options-menu');
+  useBackHandler(shareModalOpen, () => setShareModalOpen(false), 'share-modal');
+  useBackHandler(viewsModalOpen, () => setViewsModalOpen(false), 'views-modal');
 
   useEffect(() => {
     loadVideos();
@@ -236,11 +242,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   };
 
   const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
-    // If options menu is open, close it and resume actions?
+    // If any modal is open, close them first and resume?
     // User said: "hide when i click the other part of the scrren and continue playing the video i was watching"
-    // So if menu is open, just close it.
-    if (optionsMenuOpen) {
-      setOptionsMenuOpen(false);
+    if (optionsMenuOpen || commentsOpen || reviewsOpen || viewsModalOpen || shareModalOpen) {
+      closeAllModals();
       return;
     }
 
@@ -703,93 +708,98 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
           {/* Right Side Actions */}
           <div className="absolute top-1/2 -translate-y-[40%] right-4 flex flex-col items-center gap-5 z-20">
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => handleLike(video)}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-              >
+            <button
+              onClick={() => handleLike(video)}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <Heart
                   className={`w-7 h-7 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
                 />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">{video.likes_count}</span>
-            </div>
+            </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setSelectedVideo(video);
-                  setCommentsOpen(true);
-                }}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
-              >
+            <button
+              onClick={() => {
+                closeAllModals();
+                setSelectedVideo(video);
+                setCommentsOpen(true);
+              }}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <MessageSquare className="w-7 h-7 text-white" />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">Comments</span>
-            </div>
+            </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setSelectedVideo(video);
-                  setReviewsOpen(true);
-                }}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-              >
+            <button
+              onClick={() => {
+                closeAllModals();
+                setSelectedVideo(video);
+                setReviewsOpen(true);
+              }}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <MessageCircle className="w-7 h-7 text-white" />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">Reviews</span>
-            </div>
+            </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setVideoForViews(video);
-                  setViewsModalOpen(true);
-                }}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all hover:bg-black/30"
-              >
+            <button
+              onClick={() => {
+                closeAllModals();
+                setSelectedVideo(video);
+                setViewsModalOpen(true);
+              }}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <Eye className="w-7 h-7 text-white" />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">{video.views_count || 0}</span>
-            </div>
+            </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => {
-                  setSelectedVideo(video);
-                  setShareModalOpen(true);
-                }}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-              >
+            <button
+              onClick={() => {
+                closeAllModals();
+                setSelectedVideo(video);
+                setShareModalOpen(true);
+              }}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <Share2 className="w-7 h-7 text-white" />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">Share</span>
-            </div>
+            </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={() => onBookClick(video)}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-              >
+            <button
+              onClick={() => onBookClick(video)}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <Calendar className="w-7 h-7 text-white" />
-              </button>
+              </div>
               <span className="text-white text-xs font-medium drop-shadow-md">Book</span>
-            </div>
+            </button>
 
             {/* More Options Button */}
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setVideoForOptions(video);
-                  setOptionsMenuOpen(true);
-                }}
-                className="p-2.5 bg-black/20 backdrop-blur-md rounded-full active:scale-90 transition-all"
-              >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                closeAllModals();
+                setVideoForOptions(video);
+                setOptionsMenuOpen(true);
+              }}
+              className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+            >
+              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <MoreVertical className="w-7 h-7 text-white" />
-              </button>
-            </div>
+              </div>
+            </button>
           </div>
 
           {/* Bottom Info Section */}
@@ -913,7 +923,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           <VideoViewsModal
             isOpen={viewsModalOpen}
             onClose={() => setViewsModalOpen(false)}
-            videoId={videoForViews?.id || ''}
+            videoId={selectedVideo.id}
             onProfileClick={(userId) => {
               setViewsModalOpen(false);
               onProviderClick?.(userId);
