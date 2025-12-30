@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X, ArrowLeft, BarChart3, Calendar, Users, MessageSquare, Star, Eye, TrendingUp, Layout, Plus } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X, ArrowLeft, BarChart3, Calendar, Users, MessageSquare, Star, Eye, TrendingUp, Layout, Plus, Mail, Send } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { emailService } from '../lib/emailService';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type SkillVideo = Database['public']['Tables']['skill_videos']['Row'] & {
@@ -16,7 +17,7 @@ type SkillVideo = Database['public']['Tables']['skill_videos']['Row'] & {
 };
 
 export function AdminPanel({ onBack }: { onBack?: () => void }) {
-    const [activeTab, setActiveTab] = useState<'overview' | 'providers' | 'clients' | 'videos' | 'bookings' | 'moderation' | 'categories'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'providers' | 'clients' | 'videos' | 'bookings' | 'moderation' | 'categories' | 'email'>('overview');
     const [providers, setProviders] = useState<Profile[]>([]);
     const [clients, setClients] = useState<Profile[]>([]);
     const [videos, setVideos] = useState<SkillVideo[]>([]);
@@ -26,6 +27,12 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
     const [categories, setCategories] = useState<any[]>([]);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategory, setNewCategory] = useState({ name: '', icon: 'Tool' });
+
+    // Email states
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
+    const [emailRecipientType, setEmailRecipientType] = useState<'all' | 'providers' | 'clients'>('all');
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
     const [stats, setStats] = useState<{
         totalProviders: number;
         totalClients: number;
@@ -240,6 +247,20 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
         }
     };
 
+    const deleteClient = async (id: string, name: string) => {
+        if (!confirm(`Are you sure you want to delete the account for ${name}? This action cannot be undone.`)) return;
+        try {
+            // In a real app, you might want to call a service to delete the user from Auth as well
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            if (error) throw error;
+            setClients(prev => prev.filter(c => c.id !== id));
+            toast.success('Client account removed');
+        } catch (error) {
+            console.error('Error deleting client:', error);
+            toast.error('Failed to delete client account');
+        }
+    };
+
     const loadCategories = async () => {
         setLoading(true);
         try {
@@ -287,6 +308,62 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
             toast.success('Category deleted');
         } catch (error) {
             toast.error('Failed to delete category');
+        }
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!emailSubject || !emailBody) {
+            toast.error('Please provide both a subject and a message');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to send this email to ${emailRecipientType === 'all' ? 'all users' : emailRecipientType}?`)) return;
+
+        setIsSendingEmail(true);
+        try {
+            // 1. Fetch recipient emails
+            let query = supabase.from('profiles').select('email');
+
+            if (emailRecipientType === 'providers') {
+                query = query.eq('user_type', 'provider');
+            } else if (emailRecipientType === 'clients') {
+                query = query.eq('user_type', 'client');
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            const emails = (data || []).map(p => p.email).filter(Boolean) as string[];
+
+            if (emails.length === 0) {
+                toast.error('No recipients found for the selected audience');
+                return;
+            }
+
+            // 2. Send via email service
+            await emailService.sendBroadcast(emails, emailSubject, `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 10px;">
+                    <h2 style="color: #FF5722;">SkilXress Update</h2>
+                    <h1 style="font-size: 24px;">${emailSubject}</h1>
+                    <div style="line-height: 1.6; color: #333;">
+                        ${emailBody.replace(/\n/g, '<br/>')}
+                    </div>
+                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
+                    <p style="font-size: 12px; color: #999;">
+                        You are receiving this because you are a registered member of SkilXress. 
+                        To unsubscribe, please update your profile settings.
+                    </p>
+                </div>
+            `);
+
+            toast.success(`Successfully sent to ${emails.length} recipients!`);
+            setEmailSubject('');
+            setEmailBody('');
+        } catch (error) {
+            console.error('Broadcast error:', error);
+            toast.error('Failed to send broadcast');
+        } finally {
+            setIsSendingEmail(false);
         }
     };
 
@@ -410,6 +487,12 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
         return matchesSearch && b.status === bookingFilter;
     });
 
+    const filteredClients = clients.filter(c => {
+        return (c.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.location || '').toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
     return (
         <div className="min-h-screen bg-primary font-balthazar pt-20 pb-12 px-4 sm:px-6">
             <div className="max-w-6xl mx-auto">
@@ -434,7 +517,8 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                                 activeTab === 'videos' ? 'Video Moderation' :
                                                     activeTab === 'bookings' ? 'Booking Management' :
                                                         activeTab === 'categories' ? 'Service Categories' :
-                                                            'Interaction Moderation'}
+                                                            activeTab === 'email' ? 'Broadcast Center' :
+                                                                'Interaction Moderation'}
                                 </span>
                             </h1>
                             <p className="text-secondary-black/60 mt-1">
@@ -442,9 +526,15 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                     ? 'A high-level view of your platform performance.'
                                     : activeTab === 'providers'
                                         ? 'Manage and verify service providers on the platform.'
-                                        : activeTab === 'videos'
-                                            ? 'Review and approve uploaded skill videos.'
-                                            : 'Track and manage bookings between clients and providers.'}
+                                        : activeTab === 'clients'
+                                            ? 'Browse and manage your registered client user base.'
+                                            : activeTab === 'videos'
+                                                ? 'Review and approve uploaded skill videos.'
+                                                : activeTab === 'bookings'
+                                                    ? 'Track and manage bookings between clients and providers.'
+                                                    : activeTab === 'email'
+                                                        ? 'Send announcements and newsletters to your user base.'
+                                                        : 'Monitor and moderate user interactions.'}
                             </p>
                         </div>
                     </div>
@@ -457,6 +547,7 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                             else if (activeTab === 'bookings') loadBookings();
                             else if (activeTab === 'moderation') loadModerationData();
                             else if (activeTab === 'categories') loadCategories();
+                            else if (activeTab === 'email') { setEmailSubject(''); setEmailBody(''); }
                         }}
                         className="flex items-center gap-2 bg-secondary-black text-white px-4 py-2 rounded-lg hover:bg-secondary-black/80 transition-all font-bold"
                     >
@@ -536,6 +627,16 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                     >
                         <Layout className="w-5 h-5" />
                         Categories
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('email')}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'email'
+                            ? 'bg-secondary-black text-white shadow-lg'
+                            : 'bg-white text-secondary-black hover:bg-secondary-black/5'
+                            }`}
+                    >
+                        <Mail className="w-5 h-5" />
+                        Broadcast
                     </button>
                 </div>
 
@@ -768,6 +869,7 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                         <th className="px-6 py-4 font-bold text-secondary-black uppercase text-xs tracking-wider">Client</th>
                                         <th className="px-6 py-4 font-bold text-secondary-black uppercase text-xs tracking-wider">Contact & Location</th>
                                         <th className="px-6 py-4 font-bold text-secondary-black uppercase text-xs tracking-wider text-center">Joined</th>
+                                        <th className="px-6 py-4 font-bold text-secondary-black uppercase text-xs tracking-wider text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-secondary-black/5">
@@ -791,6 +893,15 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="text-secondary-black/60 text-xs">{new Date(client.created_at).toLocaleDateString()}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => deleteClient(client.id, client.full_name)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete Client Account"
+                                                >
+                                                    <X className="w-5 h-5" />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1114,6 +1225,108 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                 )}
                             </div>
                         </div>
+                    </div>
+                ) : activeTab === 'email' ? (
+                    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-secondary-black/5 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary-cyan/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+
+                            <h3 className="text-2xl font-black text-secondary-black mb-8 flex items-center gap-3">
+                                <Send className="w-7 h-7 text-secondary-orange" />
+                                Send Global Broadcast
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                                <div className="space-y-4 md:col-span-1">
+                                    <label className="text-xs font-black text-secondary-black/40 uppercase tracking-[0.2em] block">
+                                        Select Audience
+                                    </label>
+                                    <div className="flex flex-col gap-2">
+                                        {[
+                                            { id: 'all', label: 'All Registered Users', icon: Users },
+                                            { id: 'providers', label: 'Providers Only', icon: Shield },
+                                            { id: 'clients', label: 'Clients Only', icon: UserIcon }
+                                        ].map((opt) => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => setEmailRecipientType(opt.id as any)}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all border-2 ${emailRecipientType === opt.id
+                                                    ? 'bg-secondary-cyan/10 border-secondary-cyan text-secondary-cyan'
+                                                    : 'bg-white border-transparent text-secondary-black/60 hover:bg-black/5'
+                                                    }`}
+                                            >
+                                                <opt.icon className="w-4 h-4" />
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="p-4 bg-secondary-orange/5 rounded-2xl border border-secondary-orange/10">
+                                        <p className="text-[10px] text-secondary-orange font-bold uppercase tracking-widest leading-relaxed">
+                                            Tip: Keep your messages concise and professional to ensure high engagement.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6 md:col-span-2">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-secondary-black/40 uppercase tracking-[0.2em] block pl-1">
+                                            Campaign Subject
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={emailSubject}
+                                            onChange={(e) => setEmailSubject(e.target.value)}
+                                            placeholder="What's this update about?"
+                                            className="w-full px-6 py-4 rounded-2xl border-2 border-secondary-black/5 focus:border-secondary-cyan focus:ring-4 focus:ring-secondary-cyan/10 outline-none transition-all font-bold text-secondary-black"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-secondary-black/40 uppercase tracking-[0.2em] block pl-1">
+                                            Message Body (HTML Supported)
+                                        </label>
+                                        <textarea
+                                            value={emailBody}
+                                            onChange={(e) => setEmailBody(e.target.value)}
+                                            placeholder="Write your announcement here..."
+                                            rows={10}
+                                            className="w-full px-6 py-4 rounded-2xl border-2 border-secondary-black/5 focus:border-secondary-cyan focus:ring-4 focus:ring-secondary-cyan/10 outline-none transition-all font-medium text-secondary-black resize-none"
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={handleSendBroadcast}
+                                        disabled={isSendingEmail || !emailSubject || !emailBody}
+                                        className="w-full bg-secondary-black text-white py-5 rounded-2xl font-black text-lg shadow-2xl shadow-black/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:scale-100"
+                                    >
+                                        {isSendingEmail ? (
+                                            <>
+                                                <Loader2 className="w-6 h-6 animate-spin" />
+                                                Sending Broadcast...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Send className="w-6 h-6" />
+                                                Launch Broadcast
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quick Preview Card */}
+                        {(emailSubject || emailBody) && (
+                            <div className="bg-white p-8 rounded-3xl border border-dashed border-secondary-black/20 opacity-60">
+                                <p className="text-[10px] font-black uppercase text-secondary-black/40 tracking-[0.3em] mb-4 text-center">Live Email Preview</p>
+                                <div className="max-w-md mx-auto p-6 rounded-2xl border border-secondary-black/10 bg-gray-50/50">
+                                    <h4 className="font-black text-secondary-black mb-2">{emailSubject || 'No Subject'}</h4>
+                                    <div className="text-sm text-secondary-black/60 whitespace-pre-wrap leading-relaxed">
+                                        {emailBody || 'No content written yet...'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-secondary-black/10">
