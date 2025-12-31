@@ -138,12 +138,57 @@ export async function uploadAvatar(
 }
 
 /**
+ * Uploads a portfolio image to Supabase Storage
+ * @param file - The image file to upload
+ * @param userId - The ID of the user uploading the file
+ * @param onProgress - Optional callback for upload progress
+ * @returns The public URL of the uploaded image
+ */
+export async function uploadPortfolioImage(
+    file: File,
+    userId: string,
+    onProgress?: (progress: number) => void
+): Promise<string> {
+    // Validate file
+    const validation = validateFile(file, MAX_AVATAR_SIZE, ALLOWED_IMAGE_TYPES);
+    if (!validation.valid) {
+        throw new Error(validation.error);
+    }
+
+    // Generate unique file name
+    const fileName = generateFileName(userId, file.name);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+        .from('portfolio')
+        .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false,
+        });
+
+    if (error) {
+        throw new Error(`Upload failed: ${error.message}`);
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+        .from('portfolio')
+        .getPublicUrl(data.path);
+
+    if (onProgress) {
+        onProgress(100);
+    }
+
+    return urlData.publicUrl;
+}
+
+/**
  * Deletes a file from Supabase Storage
  * @param bucketName - The name of the storage bucket
  * @param filePath - The path to the file to delete
  */
 export async function deleteFile(
-    bucketName: 'videos' | 'avatars',
+    bucketName: 'videos' | 'avatars' | 'portfolio',
     filePath: string
 ): Promise<void> {
     const { error } = await supabase.storage.from(bucketName).remove([filePath]);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase, ArrowLeft } from 'lucide-react';
+import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase, ArrowLeft, TrendingUp, Eye, Users, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
@@ -8,6 +8,7 @@ import { PortfolioManager } from './PortfolioManager';
 import { ProviderStatsHeader } from './ProviderStatsHeader';
 import { ProfileCompletionMeter } from './ProfileCompletionMeter';
 import { Skeleton } from './Skeleton';
+import { ProfileModal } from './ProfileModal';
 import { useBackHandler } from '../hooks/useBackHandler';
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
@@ -55,6 +56,7 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
     averageRating: 0,
     totalReviews: 0,
   });
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const { user, profile } = useAuth();
 
   useEffect(() => {
@@ -185,39 +187,62 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
     return <Chat booking={selectedBooking} onClose={() => setShowChat(false)} />;
   }
 
+  const handleStepClick = (key: string) => {
+    if (['avatar_url', 'bio', 'specialty', 'location', 'experience'].includes(key)) {
+      setShowProfileModal(true);
+    } else if (key === 'videos') {
+      setActiveTab('videos');
+      setShowUploadForm(true);
+    } else if (key === 'portfolio') {
+      setActiveTab('portfolio');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+          <div className="flex items-center gap-5">
             {onBack && (
               <button
                 onClick={onBack}
-                className="p-2 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-600 md:hidden"
+                className="p-3 bg-white hover:bg-gray-50 rounded-2xl transition-all shadow-sm active:scale-95 text-gray-600 md:hidden border border-gray-100"
                 aria-label="Go back"
               >
                 <ArrowLeft className="w-6 h-6" />
               </button>
             )}
-            <h1 className="text-2xl font-bold">Provider Dashboard</h1>
+            <div>
+              <h1 className="text-3xl font-black text-secondary-black tracking-tight">Provider Dashboard</h1>
+              <p className="text-gray-500 font-medium">Manage your services and grow your reach</p>
+            </div>
           </div>
-          {activeTab === 'videos' && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowUploadForm(true)}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={() => setShowProfileModal(true)}
+              className="flex items-center gap-2 bg-white text-secondary-black px-5 py-3 rounded-2xl font-bold shadow-sm border border-gray-100 hover:bg-gray-50 transition-all active:scale-95"
             >
-              <Plus className="w-5 h-5" />
-              Add Video
+              <Settings className="w-5 h-5 text-gray-400" />
+              Settings
             </button>
-          )}
+            {activeTab === 'videos' && (
+              <button
+                onClick={() => setShowUploadForm(true)}
+                className="flex items-center gap-2 bg-secondary-cyan text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-secondary-cyan/20 hover:brightness-110 transition-all active:scale-95"
+              >
+                <Plus className="w-5 h-5" />
+                Add Video
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-4 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-3 mb-10 overflow-x-auto pb-4 no-scrollbar">
           <button
             onClick={() => setActiveTab('videos')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'videos'
-              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
-              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
+            className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'videos'
+              ? 'bg-secondary-black text-white ring-4 ring-secondary-black/5'
+              : 'bg-white text-gray-400 border border-gray-100 hover:text-secondary-black'
               }`}
           >
             <Video className="w-5 h-5" />
@@ -225,9 +250,9 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'bookings'
-              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
-              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
+            className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'bookings'
+              ? 'bg-secondary-black text-white ring-4 ring-secondary-black/5'
+              : 'bg-white text-gray-400 border border-gray-100 hover:text-secondary-black'
               }`}
           >
             <Calendar className="w-5 h-5" />
@@ -235,9 +260,9 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'reviews'
-              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
-              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
+            className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'reviews'
+              ? 'bg-secondary-black text-white ring-4 ring-secondary-black/5'
+              : 'bg-white text-gray-400 border border-gray-100 hover:text-secondary-black'
               }`}
           >
             <Star className="w-5 h-5" />
@@ -245,9 +270,9 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
           </button>
           <button
             onClick={() => setActiveTab('portfolio')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'portfolio'
-              ? 'bg-secondary-cyan text-white ring-4 ring-secondary-cyan/10'
-              : 'bg-white/60 backdrop-blur-md text-gray-600 border border-white hover:bg-white'
+            className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-black transition-all whitespace-nowrap shadow-sm hover:scale-[1.02] active:scale-95 ${activeTab === 'portfolio'
+              ? 'bg-secondary-black text-white ring-4 ring-secondary-black/5'
+              : 'bg-white text-gray-400 border border-gray-100 hover:text-secondary-black'
               }`}
           >
             <Briefcase className="w-5 h-5" />
@@ -255,13 +280,17 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
           </button>
         </div>
 
-        {/* Provider Stats Header */}
-        <ProviderStatsHeader profile={profile} stats={stats} />
-
         {/* Profile Completion Meter */}
         {profile?.user_type === 'provider' && (
-          <ProfileCompletionMeter profile={profile} stats={stats} />
+          <ProfileCompletionMeter
+            profile={profile}
+            stats={stats}
+            onStepClick={handleStepClick}
+          />
         )}
+
+        {/* Provider Stats Header */}
+        <ProviderStatsHeader profile={profile} stats={stats} />
 
         {loading ? (
           <div className="space-y-6">
@@ -498,6 +527,13 @@ export function ProviderDashboard({ onBack }: { onBack?: () => void }) {
           </>
         )}
       </div>
+
+      {showProfileModal && (
+        <ProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
 
       {
         showUploadForm && (

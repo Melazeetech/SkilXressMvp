@@ -57,6 +57,13 @@ function AppContent() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [privacyOpen, setPrivacyOpen] = useState(false);
 
+  // Reset guest status when a user logs in
+  useEffect(() => {
+    if (user && isGuest) {
+      setIsGuest(false);
+    }
+  }, [user, isGuest]);
+
   // Handle back button for modals and views
   useBackHandler(authModalOpen, () => setAuthModalOpen(false), 'auth-modal');
   useBackHandler(bookingModalOpen, () => setBookingModalOpen(false), 'booking-modal');
@@ -332,7 +339,7 @@ function AppContent() {
                 }}
                 className="p-2.5 bg-black/20 backdrop-blur-md rounded-2xl text-white hover:bg-black/40 transition-all shadow-lg active:scale-95 border border-white/10"
               >
-                <ArrowLeft className="w-6 h-6" />
+                <ArrowLeft className="w-5 h-5" />
               </button>
             )}
             <button
@@ -354,13 +361,13 @@ function AppContent() {
               onClick={() => setSearchModalOpen(true)}
               className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all shadow-lg active:scale-95"
             >
-              <Search className="w-6 h-6" />
+              <Search className="w-5 h-5" />
             </button>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-3 bg-black/20 backdrop-blur-md rounded-full text-white hover:bg-black/40 transition-all shadow-lg active:scale-95"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
           </div>
 

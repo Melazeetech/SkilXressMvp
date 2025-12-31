@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('AuthContext: Loading profile for', userId);
 
-      // Create a timeout promise
+      // Create a timeout promise for the fetch
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Profile load timeout')), 10000)
       );
@@ -100,10 +100,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]) as any;
 
       if (error) throw error;
-      console.log('AuthContext: Profile loaded', data);
-      setProfile(data);
+
+      if (!data) {
+        console.log('AuthContext: No profile found for signed-in user, creating one...');
+
+        // Get the pending user type from registration flow
+        const pendingType = localStorage.getItem('skilxpress_pending_user_type') as 'client' | 'provider';
+        const userType = pendingType || 'client'; // Default to client if not specified
+
+        // Get user info from currently signed in user
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+
+        if (authUser) {
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: userId,
+              email: authUser.email!,
+              full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Signed In User',
+              user_type: userType,
+            } as any);
+
+          if (upsertError) {
+            console.error('AuthContext: Error creating/updating profile:', upsertError);
+          } else {
+            console.log('AuthContext: Profile created/updated automatically as', userType);
+            // Load the newly created profile
+            const { data: newProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+            setProfile(newProfile);
+            localStorage.removeItem('skilxpress_pending_user_type');
+            localStorage.setItem('skilxpress_has_account', 'true');
+          }
+        }
+      } else {
+        console.log('AuthContext: Profile loaded', data);
+        setProfile(data);
+      }
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('Error in loadProfile:', error);
     } finally {
       console.log('AuthContext: loadProfile finished, setting loading false');
       setLoading(false);
@@ -128,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
+        .upsert({
           id: authData.user.id,
           email,
           full_name: fullName,
@@ -136,6 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } as any);
 
       if (profileError) throw profileError;
+
+      // Manually refresh profile state to ensure it's up to date
+      await loadProfile(authData.user.id);
 
       return { error: null };
     } catch (error) {

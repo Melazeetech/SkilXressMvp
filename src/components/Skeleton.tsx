@@ -24,9 +24,12 @@ export function Skeleton({ className = '', variant = 'rectangle', ...props }: Sk
 
 export function VideoSkeleton() {
     return (
-        <div className="h-screen w-full bg-black relative flex items-center justify-center overflow-hidden">
-            {/* Background Pulse */}
-            <div className="absolute inset-0 bg-secondary-black/20 animate-pulse" />
+        <div className="h-screen w-full bg-secondary-black relative flex items-center justify-center overflow-hidden">
+            {/* Shimmer Effect Background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-secondary-black via-secondary-black/80 to-secondary-black -translate-x-full animate-shimmer z-10 opacity-50" />
+
+            {/* Static Background Base */}
+            <div className="absolute inset-0 bg-secondary-black/20" />
 
             {/* Right Side Actions Skeleton */}
             <div className="absolute top-1/2 -translate-y-[40%] right-4 flex flex-col items-center gap-5 z-20">

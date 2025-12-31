@@ -7,9 +7,10 @@ interface ProfileCompletionMeterProps {
     stats: {
         totalVideos: number;
     };
+    onStepClick?: (key: string) => void;
 }
 
-export function ProfileCompletionMeter({ profile, stats }: ProfileCompletionMeterProps) {
+export function ProfileCompletionMeter({ profile, stats, onStepClick }: ProfileCompletionMeterProps) {
     const [portfolioCount, setPortfolioCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
@@ -80,32 +81,36 @@ export function ProfileCompletionMeter({ profile, stats }: ProfileCompletionMete
             {/* Steps List */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {steps.map((step, idx) => (
-                    <div
+                    <button
                         key={idx}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${step.completed
+                        onClick={() => onStepClick?.(step.key)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left group ${step.completed
                             ? 'bg-gray-50 border-transparent opacity-60'
-                            : 'bg-white border-gray-100 shadow-sm'
+                            : 'bg-white border-gray-100 shadow-sm hover:border-secondary-cyan/30 hover:shadow-md cursor-pointer'
                             }`}
                     >
                         {step.completed ? (
                             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
                         ) : (
-                            <Circle className="w-5 h-5 text-gray-300 shrink-0" />
+                            <Circle className="w-5 h-5 text-gray-300 shrink-0 group-hover:text-secondary-cyan transition-colors" />
                         )}
-                        <span className={`text-sm ${step.completed ? 'text-gray-500 line-through' : 'text-gray-700 font-medium'}`}>
+                        <span className={`text-sm ${step.completed ? 'text-gray-500 line-through' : 'text-gray-700 font-medium group-hover:text-secondary-cyan transition-colors'}`}>
                             {step.label}
                         </span>
                         {!step.completed && (
-                            <div className="ml-auto text-[10px] font-bold text-secondary-cyan bg-secondary-cyan/10 px-2 py-0.5 rounded-full">
+                            <div className="ml-auto text-[10px] font-bold text-secondary-cyan bg-secondary-cyan/10 px-2 py-0.5 rounded-full group-hover:bg-secondary-cyan group-hover:text-white transition-all">
                                 +{step.weight}%
                             </div>
                         )}
-                    </div>
+                    </button>
                 ))}
             </div>
 
             {nextStep && (
-                <div className="mt-6 p-4 bg-secondary-black rounded-xl text-white flex items-center justify-between group cursor-pointer hover:bg-black transition-colors">
+                <div
+                    onClick={() => onStepClick?.(nextStep.key)}
+                    className="mt-6 p-4 bg-secondary-black rounded-xl text-white flex items-center justify-between group cursor-pointer hover:bg-black transition-colors"
+                >
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
                             <ArrowRight className="w-5 h-5 text-secondary-cyan transition-transform group-hover:translate-x-1" />

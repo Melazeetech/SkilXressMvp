@@ -59,27 +59,8 @@ export function PortfolioManager() {
         setUploading(true);
         try {
             // 1. Upload image
-            // We'll use a specific path in 'avatars' for now if we don't have a portfolio bucket, 
-            // OR better, let's just use the 'avatars' bucket but organize it? 
-            // Actually, let's check if we can create a 'portfolio' bucket easily. 
-            // For MVP, using 'avatars' bucket is "okay" but semantically wrong. 
-            // Let's try to use `uploadAvatar` but maybe modify it or just use the logic here.
-            // Actually, I'll import `uploadPortfolioImage` which I will add to helpers in a moment.
-            // For now, I'll define the logic inline or assume the helper exists.
-
-            const fileExt = imageFile.name.split('.').pop();
-            const fileName = `${user.id}/${Math.random()}.${fileExt}`;
-            const filePath = `portfolio/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('avatars') // Reusing avatars bucket for now as it's public images
-                .upload(filePath, imageFile);
-
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath);
+            const { uploadPortfolioImage } = await import('../lib/uploadHelpers');
+            const publicUrl = await uploadPortfolioImage(imageFile, user.id);
 
             // 2. Insert record
             const { data, error } = await supabase

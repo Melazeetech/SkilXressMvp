@@ -246,7 +246,22 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
             {/* Completion Meter */}
             {activeTab === 'profile' && profile?.user_type === 'provider' && (
-              <ProfileCompletionMeter profile={profile} stats={{ totalVideos }} />
+              <ProfileCompletionMeter
+                profile={profile}
+                stats={{ totalVideos }}
+                onStepClick={(key) => {
+                  const element = document.getElementById(`profile-${key}`);
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.focus();
+                    // Add a temporary highlight effect
+                    element.classList.add('ring-2', 'ring-secondary-cyan', 'ring-offset-2');
+                    setTimeout(() => {
+                      element.classList.remove('ring-2', 'ring-secondary-cyan', 'ring-offset-2');
+                    }, 2000);
+                  }
+                }}
+              />
             )}
 
             {activeTab === 'profile' ? (
@@ -265,7 +280,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     </div>
                     <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer">
                       <Camera className="w-6 h-6" />
-                      <input type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
+                      <input id="profile-avatar_url" type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
                     </label>
                   </div>
                   <div>
@@ -281,6 +296,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       <User className="w-4 h-4" /> Full Name
                     </label>
                     <input
+                      id="profile-full_name"
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
@@ -294,6 +310,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       <FileText className="w-4 h-4" /> Bio
                     </label>
                     <textarea
+                      id="profile-bio"
                       value={bio}
                       onChange={(e) => setBio(e.target.value)}
                       rows={4}
@@ -308,6 +325,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         <Phone className="w-4 h-4" /> Phone
                       </label>
                       <input
+                        id="profile-phone"
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
@@ -321,6 +339,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         <MapPin className="w-4 h-4" /> Location
                       </label>
                       <input
+                        id="profile-location"
                         type="text"
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
@@ -337,6 +356,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <Briefcase className="w-4 h-4" /> Experience
                         </label>
                         <input
+                          id="profile-experience"
                           type="text"
                           value={experience}
                           onChange={(e) => setExperience(e.target.value)}
@@ -350,6 +370,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <Star className="w-4 h-4" /> Specialty
                         </label>
                         <input
+                          id="profile-specialty"
                           type="text"
                           value={specialty}
                           onChange={(e) => setSpecialty(e.target.value)}

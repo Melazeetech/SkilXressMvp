@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Heart, MapPin, Star, Share2, MessageCircle, Plus, Play, Calendar, Eye, VolumeX, BadgeCheck, MoreVertical, Flag, AlertCircle } from 'lucide-react';
+import { MessageSquare, Heart, MapPin, Star, Share2, MessageCircle, Plus, Play, Pause, Calendar, Eye, VolumeX, BadgeCheck, MoreVertical, Flag, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import { useBackHandler } from '../hooks/useBackHandler';
 import { VideoViewsModal } from './VideoViewsModal';
 import { VideoCommentsSheet } from './VideoCommentsSheet';
 import { VideoSkeleton } from './Skeleton';
+import { VideoUploadModal } from './VideoUploadModal';
 
 type Video = Database['public']['Tables']['skill_videos']['Row'] & {
   public_profiles: {
@@ -55,10 +56,12 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
   const lastViewedVideoId = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
   const [videoForOptions, setVideoForOptions] = useState<Video | null>(null);
+  const [showPauseIcon, setShowPauseIcon] = useState(false);
 
   const closeAllModals = () => {
     setCommentsOpen(false);
@@ -267,6 +270,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       } else {
         video.pause();
         setIsPlaying(false);
+        setShowPauseIcon(true);
+        setTimeout(() => setShowPauseIcon(false), 500);
       }
 
       // Also unmute if playing
@@ -363,6 +368,20 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
 
       console.log('VideoFeed: Fetched videos count:', data?.length);
 
+      // Fetch user preferences (e.g. not interested) if logged in
+      let notInterestedIds: string[] = [];
+      if (user) {
+        const { data: prefsData } = await supabase
+          .from('user_video_preferences')
+          .select('video_id')
+          .eq('user_id', user.id)
+          .eq('preference_type', 'not_interested');
+
+        if (prefsData) {
+          notInterestedIds = prefsData.map(p => p.video_id);
+        }
+      }
+
       const videosWithLikes = await Promise.all(
         ((data as any[]) || []).map(async (video) => {
           let userLiked = false;
@@ -421,7 +440,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
       );
 
       // Filter out videos with missing profiles (e.g. due to RLS or deleted users)
-      const validVideos = videosWithLikes.filter((v: any) => v.public_profiles);
+      // AND filter out 'not_interested' videos
+      const validVideos = videosWithLikes.filter((v: any) =>
+        v.public_profiles && !notInterestedIds.includes(v.id)
+      );
 
       const filteredVideos = locationFilter
         ? validVideos.filter((v: Video) =>
@@ -496,12 +518,8 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         if (error) throw error;
       }
 
-      // Update the count in skill_videos table
-      await supabase
-        .from('skill_videos')
-        // @ts-ignore
-        .update({ likes_count: newLikesCount })
-        .eq('id', video.id);
+      // No need to manually update likes_count anymore, the DB trigger handles it.
+      // But we keep the optimistic update in the state for responsiveness.
 
     } catch (error) {
       console.error('Error liking video:', error);
@@ -523,6 +541,63 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         next.delete(video.id);
         return next;
       });
+    }
+  };
+
+  const handleReportVideo = async (video: Video) => {
+    if (!user) {
+      onAuthRequired?.();
+      return;
+    }
+
+    const reason = window.prompt('Please provide a reason for reporting this video (e.g. Inappropriate content, Spam, Harassment):');
+    if (!reason) return;
+
+    try {
+      const { error } = await supabase
+        .from('video_reports')
+        // @ts-ignore
+        .insert({
+          video_id: video.id,
+          user_id: user.id,
+          reason: reason
+        });
+
+      if (error) throw error;
+      toast.success('Thank you for reporting. Our team will review it.');
+      setOptionsMenuOpen(false);
+    } catch (error) {
+      console.error('Error reporting video:', error);
+      toast.error('Failed to submit report. Please try again.');
+    }
+  };
+
+  const handleNotInterested = async (video: Video) => {
+    if (!user) {
+      onAuthRequired?.();
+      return;
+    }
+
+    try {
+      // Record preference
+      const { error } = await supabase
+        .from('user_video_preferences')
+        // @ts-ignore
+        .insert({
+          user_id: user.id,
+          video_id: video.id,
+          preference_type: 'not_interested'
+        });
+
+      if (error && error.code !== '23505') throw error;
+
+      // Optimistic filter from local state
+      setVideos(prev => prev.filter(v => v.id !== video.id));
+      toast.success('We will show you fewer videos like this.');
+      setOptionsMenuOpen(false);
+    } catch (error) {
+      console.error('Error recording preference:', error);
+      toast.error('Failed to save preference.');
     }
   };
 
@@ -666,11 +741,19 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
             onDoubleClick={(e) => handleDoubleTap(e, video)}
           />
 
-          {/* Play Icon Overlay */}
-          {!isPlaying && index === currentIndex && (
+          {/* Play/Pause Icon Overlay */}
+          {!isPlaying && index === currentIndex && !showPauseIcon && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
               <div className="bg-black/40 p-4 rounded-full backdrop-blur-sm animate-in fade-in zoom-in duration-200">
                 <Play className="w-12 h-12 text-white fill-white" />
+              </div>
+            </div>
+          )}
+
+          {showPauseIcon && index === currentIndex && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+              <div className="bg-black/40 p-4 rounded-full backdrop-blur-sm animate-out fade-out zoom-out duration-500">
+                <Pause className="w-12 h-12 text-white fill-white" />
               </div>
             </div>
           )}
@@ -707,17 +790,18 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none" />
 
           {/* Right Side Actions */}
-          <div className="absolute top-1/2 -translate-y-[40%] right-4 flex flex-col items-center gap-5 z-20">
+          <div className="absolute top-1/2 -translate-y-[40%] right-4 flex flex-col items-center gap-4 z-20">
             <button
               onClick={() => handleLike(video)}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+              title="Like"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
                 <Heart
-                  className={`w-7 h-7 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
+                  className={`w-4 h-4 ${video.user_liked ? 'fill-secondary-orange text-secondary-orange' : 'text-white'}`}
                 />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">{video.likes_count}</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">{video.likes_count}</span>
             </button>
 
             <button
@@ -727,11 +811,13 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                 setCommentsOpen(true);
               }}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+              title="Comments"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <MessageSquare className="w-7 h-7 text-white" />
+
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+                <MessageSquare className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">Comments</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">Comments</span>
             </button>
 
             <button
@@ -742,10 +828,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               }}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <MessageCircle className="w-7 h-7 text-white" />
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+                <MessageCircle className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">Reviews</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">Reviews</span>
             </button>
 
             <button
@@ -756,10 +842,10 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               }}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <Eye className="w-7 h-7 text-white" />
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+                <Eye className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">{video.views_count || 0}</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">{video.views_count || 0}</span>
             </button>
 
             <button
@@ -770,21 +856,36 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               }}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <Share2 className="w-7 h-7 text-white" />
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+                <Share2 className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">Share</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">Share</span>
             </button>
 
             <button
               onClick={() => onBookClick(video)}
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
             >
-              <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <Calendar className="w-7 h-7 text-white" />
+              <div className="p-2 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
+                <Calendar className="w-4 h-4 text-white" />
               </div>
-              <span className="text-white text-xs font-medium drop-shadow-md">Book</span>
+              <span className="text-white text-[10px] font-medium drop-shadow-md">Book</span>
             </button>
+
+            {profile?.user_type === 'provider' && (
+              <button
+                onClick={() => {
+                  closeAllModals();
+                  setUploadModalOpen(true);
+                }}
+                className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
+              >
+                <div className="p-2 bg-secondary-orange/80 backdrop-blur-md rounded-full transition-all group-hover:bg-secondary-orange shadow-lg shadow-secondary-orange/20">
+                  <Plus className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-bold drop-shadow-md">Post</span>
+              </button>
+            )}
 
             {/* More Options Button */}
             <button
@@ -797,7 +898,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
               className="group flex flex-col items-center gap-1 active:scale-95 transition-all"
             >
               <div className="p-2.5 bg-black/20 backdrop-blur-md rounded-full transition-all group-hover:bg-black/30">
-                <MoreVertical className="w-7 h-7 text-white" />
+                <MoreVertical className="w-5 h-5 text-white" />
               </div>
             </button>
           </div>
@@ -840,7 +941,7 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
                       <h3 className="font-bold text-lg drop-shadow-md hover:underline decoration-2 underline-offset-2 flex items-center gap-1">
                         {video.public_profiles?.full_name}
                         {video.public_profiles?.is_verified && (
-                          <BadgeCheck className="w-5 h-5 text-secondary-cyan fill-white drop-shadow-md" />
+                          <BadgeCheck className="w-4 h-4 text-secondary-cyan fill-white drop-shadow-md" />
                         )}
                       </h3>
                       {(video.average_rating || 0) > 0 && (
@@ -932,6 +1033,14 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
         </>
       )}
 
+      <VideoUploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={() => {
+          loadVideos(); // Refresh feed after upload
+        }}
+      />
+
       {/* Side Options Menu */}
       {optionsMenuOpen && videoForOptions && (
         <>
@@ -945,11 +1054,17 @@ export function VideoFeed({ categoryFilter, searchQuery, locationFilter, onBookC
           <div className="absolute top-0 right-0 bottom-0 w-64 bg-black/80 backdrop-blur-xl border-l border-white/10 p-6 z-50 animate-in slide-in-from-right duration-300">
             <h3 className="text-white font-bold text-lg mb-6">Options</h3>
             <div className="space-y-4">
-              <button className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors">
+              <button
+                onClick={() => handleReportVideo(videoForOptions)}
+                className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors"
+              >
                 <Flag className="w-5 h-5" />
                 <span className="font-medium">Report Video</span>
               </button>
-              <button className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors">
+              <button
+                onClick={() => handleNotInterested(videoForOptions)}
+                className="w-full flex items-center gap-3 text-white hover:bg-white/10 p-3 rounded-xl transition-colors"
+              >
                 <AlertCircle className="w-5 h-5" />
                 <span className="font-medium">Not Interested</span>
               </button>

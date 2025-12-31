@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
-import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X, ArrowLeft, BarChart3, Calendar, Users, MessageSquare, Star, Eye, TrendingUp, Layout, Plus, Mail, Send } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Search, User as UserIcon, RefreshCw, Play, Shield, Video, Check, X, ArrowLeft, BarChart3, Calendar, Users, MessageSquare, Star, Eye, TrendingUp, Layout, Plus, Mail, Send, Flag } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { emailService } from '../lib/emailService';
 
@@ -24,6 +24,7 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
     const [bookings, setBookings] = useState<any[]>([]);
     const [comments, setComments] = useState<any[]>([]);
     const [reviews, setReviews] = useState<any[]>([]);
+    const [videoReports, setVideoReports] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategory, setNewCategory] = useState({ name: '', icon: 'Tool' });
@@ -177,7 +178,8 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
         try {
             const [
                 { data: commentsData, error: commError },
-                { data: reviewsData, error: revError }
+                { data: reviewsData, error: revError },
+                { data: reportsData, error: repError }
             ] = await Promise.all([
                 supabase.from('video_comments').select(`
                     *,
@@ -188,14 +190,21 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                     *,
                     client:profiles!ratings_client_id_fkey (full_name, avatar_url),
                     provider:profiles!ratings_provider_id_fkey (full_name, avatar_url)
+                `).order('created_at', { ascending: false }).limit(20),
+                supabase.from('video_reports').select(`
+                  *,
+                  user:profiles (full_name, avatar_url),
+                  video:skill_videos (title, provider_id)
                 `).order('created_at', { ascending: false }).limit(20)
             ]);
 
             if (commError) throw commError;
             if (revError) throw revError;
+            if (repError) throw repError;
 
             setComments(commentsData || []);
             setReviews(reviewsData || []);
+            setVideoReports(reportsData || []);
         } catch (error) {
             console.error('Error loading moderation data:', error);
             toast.error('Failed to load moderation data');
@@ -225,6 +234,21 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
             toast.success('Review deleted');
         } catch (error) {
             toast.error('Failed to delete review');
+        }
+    };
+
+    const dismissReport = async (id: string) => {
+        if (!confirm('Are you sure you want to dismiss this report?')) return;
+        try {
+            const { error } = await supabase
+                .from('video_reports')
+                .update({ status: 'dismissed' } as any)
+                .eq('id', id);
+            if (error) throw error;
+            setVideoReports(prev => prev.filter(r => r.id !== id));
+            toast.success('Report dismissed');
+        } catch (error) {
+            toast.error('Failed to dismiss report');
         }
     };
 
@@ -1147,6 +1171,53 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                     </div>
                 ) : activeTab === 'moderation' ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Video Reports Moderation */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <h3 className="text-lg font-bold text-secondary-black flex items-center gap-2">
+                                <Flag className="w-5 h-5 text-red-500" />
+                                Video Reports
+                            </h3>
+                            <div className="bg-white rounded-2xl shadow-sm border border-secondary-black/5 divide-y divide-secondary-black/5">
+                                {videoReports.map((report) => (
+                                    <div key={report.id} className="p-4 hover:bg-secondary-cyan/5 transition-colors group">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-full bg-secondary-black/10 overflow-hidden">
+                                                    {report.user?.avatar_url && <img src={report.user.avatar_url} className="w-full h-full object-cover" />}
+                                                </div>
+                                                <span className="text-xs font-bold text-secondary-cyan">{report.user?.full_name || 'Anonymous'}</span>
+                                                <span className="text-xs font-bold text-red-500">reported video "{report.video?.title}"</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={() => updateVideoStatus(report.video_id, 'rejected')}
+                                                    className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-all text-xs font-bold flex items-center gap-1"
+                                                    title="Reject Video"
+                                                >
+                                                    <XCircle className="w-4 h-4" /> Reject
+                                                </button>
+                                                <button
+                                                    onClick={() => dismissReport(report.id)}
+                                                    className="p-1.5 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-all text-xs font-bold flex items-center gap-1"
+                                                    title="Dismiss Report"
+                                                >
+                                                    <CheckCircle className="w-4 h-4" /> Dismiss
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="bg-red-50/50 p-3 rounded-xl border border-red-100 mt-2">
+                                            <div className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">Reason</div>
+                                            <p className="text-sm font-bold text-secondary-black">{report.reason}</p>
+                                        </div>
+                                        <div className="text-[10px] text-secondary-black/30 mt-2 italic">{new Date(report.created_at).toLocaleString()}</div>
+                                    </div>
+                                ))}
+                                {videoReports.length === 0 && (
+                                    <div className="p-12 text-center opacity-30 font-bold">No reports to review</div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Comments Moderation */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-bold text-secondary-black flex items-center gap-2">
