@@ -80,6 +80,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Update last_seen_at when profile is loaded or user interacts
+  useEffect(() => {
+    if (user && profile) {
+      const updateLastSeen = async () => {
+        const lastUpdate = localStorage.getItem(`last_seen_update_${user.id}`);
+        const now = Date.now();
+
+        // Only update once every hour to save resources
+        if (!lastUpdate || now - parseInt(lastUpdate) > 3600000) {
+          await supabase
+            .from('profiles')
+            .update({ last_seen_at: new Date().toISOString() } as any)
+            .eq('id', user.id);
+          localStorage.setItem(`last_seen_update_${user.id}`, now.toString());
+        }
+      };
+
+      updateLastSeen();
+    }
+  }, [user, profile]);
+
   const loadProfile = async (userId: string) => {
     try {
       console.log('AuthContext: Loading profile for', userId);
