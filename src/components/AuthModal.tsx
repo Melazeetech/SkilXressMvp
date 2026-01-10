@@ -145,6 +145,11 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
+      // Persist userType so that AuthContext can use it after redirect
+      if (mode === 'signup') {
+        localStorage.setItem('skilxpress_pending_user_type', userType);
+        console.log('AuthModal: Persisting userType for Google Sign Up:', userType);
+      }
       const { error } = await signInWithGoogle();
       if (error) throw error;
       // No need to close modal here as redirect will happen
@@ -443,7 +448,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="text-sm font-bold text-gray-400 capitalize">{userType} details</div>
+                <h2 className="text-xl font-bold text-secondary-black">Create {userType === 'provider' ? 'Provider' : 'Client'} Account</h2>
               </div>
             )}
 
@@ -603,17 +608,6 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
         )}
 
         {/* Toggle Mode */}
-        {mode === 'signin' && (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setMode('forgot-password')}
-              className="text-sm font-bold text-gray-400 hover:text-secondary-orange transition-colors"
-            >
-              Forgot password?
-            </button>
-          </div>
-        )}
 
         {mode !== 'forgot-password' && (
           null
@@ -622,3 +616,4 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
     </div >
   );
 }
+

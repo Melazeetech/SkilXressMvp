@@ -412,6 +412,38 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
         }
     };
 
+    const convertUserType = async (userId: string, newType: 'client' | 'provider') => {
+        const confirmMsg = `Are you sure you want to convert this user to a ${newType}? This will change their dashboard and permissions.`;
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('profiles')
+                .update({ user_type: newType } as any)
+                .eq('id', userId);
+
+            if (error) throw error;
+
+            toast.success(`User successfully converted to ${newType}`);
+
+            // Refresh counts and lists
+            loadStats();
+            if (newType === 'client') {
+                loadProviders();
+                loadClients();
+            } else {
+                loadClients();
+                loadProviders();
+            }
+        } catch (error) {
+            console.error('Error converting user type:', error);
+            toast.error('Failed to convert user role');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const updateVideoStatus = async (videoId: string, status: 'approved' | 'rejected') => {
         try {
             console.log(`AdminPanel: Attempting to update video ${videoId} status to ${status}...`);
@@ -858,15 +890,23 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => toggleVerification(provider.id, provider.is_verified || false)}
-                                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${provider.is_verified
-                                                        ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                                                        : 'bg-secondary-black text-white hover:bg-secondary-black/80 shadow-md'
-                                                        }`}
-                                                >
-                                                    {provider.is_verified ? 'Revoke' : 'Verify Now'}
-                                                </button>
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={() => toggleVerification(provider.id, provider.is_verified || false)}
+                                                        className={`w-full px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${provider.is_verified
+                                                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                                                            : 'bg-secondary-black text-white hover:bg-secondary-black/80 shadow-md'
+                                                            }`}
+                                                    >
+                                                        {provider.is_verified ? 'Revoke' : 'Verify Now'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => convertUserType(provider.id, 'client')}
+                                                        className="w-full px-4 py-1.5 rounded-lg text-xs font-bold bg-white text-secondary-black border border-secondary-black/10 hover:bg-secondary-black/5 transition-all outline-none"
+                                                    >
+                                                        Make Client
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -919,13 +959,21 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
                                                 <div className="text-secondary-black/60 text-xs">{new Date(client.created_at).toLocaleDateString()}</div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => deleteClient(client.id, client.full_name)}
-                                                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Delete Client Account"
-                                                >
-                                                    <X className="w-5 h-5" />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => convertUserType(client.id, 'provider')}
+                                                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-secondary-orange text-white hover:bg-secondary-orange/90 transition-all shadow-md"
+                                                    >
+                                                        Make Provider
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteClient(client.id, client.full_name)}
+                                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                                                        title="Delete Client Account"
+                                                    >
+                                                        <X className="w-5 h-5" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -1409,3 +1457,5 @@ export function AdminPanel({ onBack }: { onBack?: () => void }) {
         </div>
     );
 }
+
+
