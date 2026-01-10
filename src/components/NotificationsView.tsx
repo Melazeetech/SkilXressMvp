@@ -3,6 +3,7 @@ import { Bell, Heart, UserPlus, Calendar, Loader2, Trash2, Check, CheckCheck, Me
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { notificationService } from '../lib/notificationService';
 
 type NotificationItem = {
     id: string;
@@ -211,7 +212,7 @@ export function NotificationsView() {
                                 </p>
                                 <button
                                     onClick={async () => {
-                                        const granted = await (await import('../lib/notificationService')).notificationService.requestPermission();
+                                        const granted = await notificationService.requestPermission();
                                         if (granted) {
                                             toast.success('Notifications enabled!');
                                             // Force a re-render

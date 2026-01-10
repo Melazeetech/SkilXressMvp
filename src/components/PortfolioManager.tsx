@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, Image as ImageIcon, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 import { useAuth } from '../contexts/AuthContext';
+import { uploadPortfolioImage } from '../lib/uploadHelpers';
 
 type WorkSample = Database['public']['Tables']['work_samples']['Row'];
 
@@ -59,7 +60,6 @@ export function PortfolioManager() {
         setUploading(true);
         try {
             // 1. Upload image
-            const { uploadPortfolioImage } = await import('../lib/uploadHelpers');
             const publicUrl = await uploadPortfolioImage(imageFile, user.id);
 
             // 2. Insert record

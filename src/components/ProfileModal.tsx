@@ -3,6 +3,7 @@ import { X, Loader2, Camera, User, Lock, Eye, Shield, Trash2, LogOut, Settings, 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
+import { uploadAvatar } from '../lib/uploadHelpers';
 import { ProfileCompletionMeter } from './ProfileCompletionMeter';
 
 interface ProfileModalProps {
@@ -84,7 +85,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       let finalAvatarUrl = avatarUrl;
 
       if (avatarFile) {
-        const { uploadAvatar } = await import('../lib/uploadHelpers');
         finalAvatarUrl = await uploadAvatar(avatarFile, user.id);
       }
 

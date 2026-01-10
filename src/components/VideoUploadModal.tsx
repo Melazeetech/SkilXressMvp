@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
 import { toast } from 'react-hot-toast';
+import { uploadVideo } from '../lib/uploadHelpers';
+import { isTikTokUrl, getTikTokMetadata } from '../lib/tiktokHelpers';
 
 type Category = Database['public']['Tables']['skill_categories']['Row'];
 
@@ -57,7 +59,6 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
             let finalVideoUrl = videoUrl;
 
             if (uploadMethod === 'file' && videoFile) {
-                const { uploadVideo } = await import('../lib/uploadHelpers');
                 finalVideoUrl = await uploadVideo(videoFile, user.id, (progress) => {
                     setUploadProgress(progress);
                 });
@@ -222,7 +223,6 @@ export function VideoUploadModal({ isOpen, onClose, onSuccess }: VideoUploadModa
                                     setVideoUrl(url);
 
                                     if (url.includes('tiktok.com')) {
-                                        const { isTikTokUrl, getTikTokMetadata } = await import('../lib/tiktokHelpers');
                                         if (isTikTokUrl(url)) {
                                             const metadata = await getTikTokMetadata(url);
                                             if (metadata) {

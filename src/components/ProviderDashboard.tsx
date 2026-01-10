@@ -3,6 +3,7 @@ import { Plus, Video, Calendar, CheckCircle, X, MessageCircle, Star, Briefcase, 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Database } from '../lib/database.types';
+import { uploadVideo } from '../lib/uploadHelpers';
 import { Chat } from './Chat';
 import { PortfolioManager } from './PortfolioManager';
 import { ProviderStatsHeader } from './ProviderStatsHeader';
@@ -590,7 +591,6 @@ function VideoUploadForm({
 
       // If uploading a file, upload it first
       if (uploadMethod === 'file' && videoFile) {
-        const { uploadVideo } = await import('../lib/uploadHelpers');
         finalVideoUrl = await uploadVideo(videoFile, user.id, (progress) => {
           setUploadProgress(progress);
         });

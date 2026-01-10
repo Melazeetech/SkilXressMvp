@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const ADMIN_EMAIL = Deno.env.get('ADMIN_EMAIL') || 'admin@skilxpress.com'
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -91,6 +92,21 @@ serve(async (req) => {
                 .eq('following_id', record.provider_id)
 
             if (provider && followers) {
+                // 1. Notify Admin
+                notifications.push({
+                    to: ADMIN_EMAIL,
+                    subject: `New Video for Approval: ${record.title}`,
+                    html: `
+                        <h1>New Video Uploaded</h1>
+                        <p>A new video has been uploaded by <strong>${provider.full_name}</strong> and requires moderation.</p>
+                        <p><strong>Title:</strong> ${record.title}</p>
+                        <p><strong>Description:</strong> ${record.description || 'No description provided'}</p>
+                        <p>Please log in to the admin panel to approve or reject this video.</p>
+                        <a href="https://skilxpress.com/admin/moderation">Go to Moderation Panel</a>
+                    `
+                })
+
+                // 2. Notify Followers
                 followers.forEach((f: any) => {
                     const followerEmail = f.profiles?.email
                     const followerName = f.profiles?.full_name
